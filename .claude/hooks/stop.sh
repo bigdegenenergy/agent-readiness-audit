@@ -19,6 +19,12 @@
 echo "🔍 Running end-of-turn quality checks..."
 echo "   (Feedback loop: verifying Claude's work)"
 
+# Security: Use session-specific temp directory to prevent symlink attacks
+CLAUDE_TEMP_DIR="${TMPDIR:-/tmp}/claude-hooks-${UID:-$(id -u)}"
+mkdir -p "$CLAUDE_TEMP_DIR" 2>/dev/null
+chmod 700 "$CLAUDE_TEMP_DIR" 2>/dev/null
+LOG_PREFIX="$CLAUDE_TEMP_DIR/${CLAUDE_SESSION_ID:-default}"
+
 # Initialize exit code
 EXIT_CODE=0
 CRITICAL_FAILURE=0
@@ -26,7 +32,7 @@ CRITICAL_FAILURE=0
 # Check 1: Run tests if they exist
 if [ -f "package.json" ] && grep -q "\"test\"" package.json; then
     echo "  Running npm tests..."
-    if npm test 2>&1 | tee /tmp/claude_test_output.log; then
+    if npm test 2>&1 | tee "${LOG_PREFIX}_test.log"; then
         echo "  ✅ Tests passed"
     else
         echo "  ❌ Tests failed"
@@ -34,7 +40,7 @@ if [ -f "package.json" ] && grep -q "\"test\"" package.json; then
     fi
 elif [ -f "pytest.ini" ] || [ -d "tests" ]; then
     echo "  Running pytest..."
-    if pytest --quiet 2>&1 | tee /tmp/claude_test_output.log; then
+    if pytest --quiet 2>&1 | tee "${LOG_PREFIX}_test.log"; then
         echo "  ✅ Tests passed"
     else
         echo "  ❌ Tests failed"
@@ -42,7 +48,7 @@ elif [ -f "pytest.ini" ] || [ -d "tests" ]; then
     fi
 elif [ -f "Cargo.toml" ]; then
     echo "  Running cargo test..."
-    if cargo test --quiet 2>&1 | tee /tmp/claude_test_output.log; then
+    if cargo test --quiet 2>&1 | tee "${LOG_PREFIX}_test.log"; then
         echo "  ✅ Tests passed"
     else
         echo "  ❌ Tests failed"
@@ -53,7 +59,7 @@ fi
 # Check 2: Type checking
 if [ -f "tsconfig.json" ]; then
     echo "  Running TypeScript type checking..."
-    if npx tsc --noEmit 2>&1 | tee /tmp/claude_typecheck_output.log; then
+    if npx tsc --noEmit 2>&1 | tee "${LOG_PREFIX}_typecheck.log"; then
         echo "  ✅ Type checking passed"
     else
         echo "  ⚠️  Type checking found issues"
@@ -61,7 +67,7 @@ if [ -f "tsconfig.json" ]; then
     fi
 elif command -v mypy &> /dev/null && [ -f "pyproject.toml" ]; then
     echo "  Running mypy type checking..."
-    if mypy . 2>&1 | tee /tmp/claude_typecheck_output.log; then
+    if mypy . 2>&1 | tee "${LOG_PREFIX}_typecheck.log"; then
         echo "  ✅ Type checking passed"
     else
         echo "  ⚠️  Type checking found issues"
@@ -71,14 +77,14 @@ fi
 # Check 3: Linting
 if [ -f ".eslintrc.js" ] || [ -f ".eslintrc.json" ]; then
     echo "  Running ESLint..."
-    if npx eslint . 2>&1 | tee /tmp/claude_lint_output.log; then
+    if npx eslint . 2>&1 | tee "${LOG_PREFIX}_lint.log"; then
         echo "  ✅ Linting passed"
     else
         echo "  ⚠️  Linting found issues"
     fi
 elif command -v ruff &> /dev/null; then
     echo "  Running ruff..."
-    if ruff check . 2>&1 | tee /tmp/claude_lint_output.log; then
+    if ruff check . 2>&1 | tee "${LOG_PREFIX}_lint.log"; then
         echo "  ✅ Linting passed"
     else
         echo "  ⚠️  Linting found issues"
@@ -88,7 +94,7 @@ fi
 # Check 4: Security scanning (if tools are available)
 if command -v bandit &> /dev/null && find . -name "*.py" | grep -q .; then
     echo "  Running security scan with bandit..."
-    if bandit -r . -ll 2>&1 | tee /tmp/claude_security_output.log; then
+    if bandit -r . -ll 2>&1 | tee "${LOG_PREFIX}_security.log"; then
         echo "  ✅ No security issues found"
     else
         echo "  ⚠️  Security scan found potential issues"

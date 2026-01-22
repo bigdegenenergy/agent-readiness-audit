@@ -106,17 +106,11 @@ if [[ "$TOOL_NAME" == "Bash" ]] && [[ -n "$BASH_COMMAND" ]]; then
         exit 0
     fi
 
-    # Build commands - safe
-    if [[ "$BASH_COMMAND" =~ ^npm\ run\ build ]] || \
-       [[ "$BASH_COMMAND" =~ ^pnpm\ build ]] || \
-       [[ "$BASH_COMMAND" =~ ^yarn\ build ]] || \
-       [[ "$BASH_COMMAND" =~ ^cargo\ build ]] || \
-       [[ "$BASH_COMMAND" =~ ^go\ build ]] || \
-       [[ "$BASH_COMMAND" =~ ^make$ ]] || \
-       [[ "$BASH_COMMAND" =~ ^make\ build ]]; then
-        echo '{"decision": "approve"}'
-        exit 0
-    fi
+    # Build commands - REMOVED from auto-approve
+    # Security: Build tools execute code from config files (package.json, Makefile).
+    # If the agent can modify these files and then run build commands, it could
+    # execute arbitrary code without human approval. These commands now require
+    # manual approval to maintain the security boundary.
 
     # Type checking - read-only
     if [[ "$BASH_COMMAND" =~ ^npx\ tsc ]] || \

@@ -159,16 +159,26 @@ jobs:
             message += `---\n`;
             message += `*This is an automated scan. If this is a false positive, the patterns above may need updating.*`;
 
-            // Post comment
+            // Post comment (skip for forked PRs - GITHUB_TOKEN is read-only)
             const issueNumber = context.issue?.number || context.payload.pull_request?.number;
-            if (issueNumber) {
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: issueNumber,
-                body: message
-              });
-              console.log(`Posted PII alert on ${contentType} #${issueNumber}`);
+            const isFork = context.payload.pull_request?.head?.repo?.fork === true;
+
+            if (issueNumber && !isFork) {
+              try {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issueNumber,
+                  body: message
+                });
+                console.log(`Posted PII alert on ${contentType} #${issueNumber}`);
+              } catch (error) {
+                console.log(`Warning: Could not post comment (may be a fork): ${error.message}`);
+              }
+            } else if (isFork) {
+              console.log(`Skipping comment on forked PR #${issueNumber} (read-only token)`);
+              console.log('PII Alert Message:');
+              console.log(message);
             }
 
             // Always fail when PII is found - this is a public repo

@@ -179,7 +179,7 @@ $RECYCLE.BIN/
 *.json
 !tests/fixtures/**/*.json
 !.claude/settings.json
-!.claude/settings.local.json
+# Note: .claude/settings.local.json should remain ignored (machine-specific config)
 *.md
 !README.md
 !CHANGELOG.md
