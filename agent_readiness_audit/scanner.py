@@ -9,14 +9,19 @@ from agent_readiness_audit.checks.base import (
     run_check,
 )
 from agent_readiness_audit.models import (
+    PILLAR_INFO,
     AuditConfig,
     CategoryScore,
+    Pillar,
+    PillarScore,
     RepoResult,
     ScanSummary,
+    calculate_maturity_level,
     get_level_for_score,
+    get_maturity_info,
 )
 
-# Category order for consistent output
+# Category order for consistent output (v1 compatibility)
 CATEGORY_ORDER = [
     "discoverability",
     "deterministic_setup",
@@ -28,7 +33,7 @@ CATEGORY_ORDER = [
     "security_and_governance",
 ]
 
-# Category descriptions
+# Category descriptions (v1 compatibility)
 CATEGORY_DESCRIPTIONS = {
     "discoverability": "Repo orientation: README presence and basic onboarding clarity",
     "deterministic_setup": "Reproducible dependency setup and pinning",
@@ -38,6 +43,21 @@ CATEGORY_DESCRIPTIONS = {
     "observability": "Logging/metrics help agents validate behavior changes",
     "ci_enforcement": "CI exists and validates changes",
     "security_and_governance": "Baseline hygiene around secrets and contribution policy",
+}
+
+# Category to pillar mapping (v1 -> v2)
+CATEGORY_TO_PILLAR: dict[str, list[str]] = {
+    "discoverability": [Pillar.DISTRIBUTION_DX.value],
+    "deterministic_setup": [Pillar.ENVIRONMENT_DETERMINISM.value],
+    "build_and_run": [Pillar.FAST_GUARDRAILS.value, Pillar.DISTRIBUTION_DX.value],
+    "test_feedback_loop": [
+        Pillar.VERIFICATION_TRUST.value,
+        Pillar.VERIFICATION_SPEED.value,
+    ],
+    "static_guardrails": [Pillar.FAST_GUARDRAILS.value, Pillar.TYPE_CONTRACTS.value],
+    "observability": [Pillar.STRUCTURED_LOGGING_COST.value],
+    "ci_enforcement": [Pillar.VERIFICATION_TRUST.value],
+    "security_and_governance": [Pillar.SECRET_HYGIENE.value],
 }
 
 # Fix-first priority mapping
@@ -127,7 +147,7 @@ def scan_repo(repo_path: Path, config: AuditConfig) -> RepoResult:
         repo_name=repo_path.name,
     )
 
-    # Initialize category scores
+    # Initialize category scores (v1 compatibility)
     for category in CATEGORY_ORDER:
         cat_config = config.categories.get(category)
         if cat_config and not cat_config.enabled:
@@ -139,9 +159,24 @@ def scan_repo(repo_path: Path, config: AuditConfig) -> RepoResult:
             max_points=cat_config.max_points if cat_config else 2.0,
         )
 
+    # Initialize pillar scores (v2)
+    for pillar in Pillar:
+        if pillar.value in config.ignore.pillars:
+            continue
+        info = PILLAR_INFO.get(pillar, {})
+        result.pillar_scores[pillar.value] = PillarScore(
+            pillar=pillar.value,
+            name=info.get("name", pillar.value),
+            description=info.get("description", ""),
+        )
+
     # Run all checks
     all_checks = get_all_checks()
     for check_name, check_def in all_checks.items():
+        # Check if check is ignored
+        if check_name in config.ignore.checks:
+            continue
+
         # Check if check is enabled
         check_config = config.checks.get(check_name)
         if check_config and not check_config.enabled:
@@ -152,6 +187,10 @@ def scan_repo(repo_path: Path, config: AuditConfig) -> RepoResult:
         if cat_config and not cat_config.enabled:
             continue
 
+        # Check if pillar is ignored
+        if check_def.pillar and check_def.pillar in config.ignore.pillars:
+            continue
+
         # Run the check
         check_result = run_check(check_def, repo_path)
 
@@ -159,7 +198,10 @@ def scan_repo(repo_path: Path, config: AuditConfig) -> RepoResult:
         if check_config:
             check_result.weight = check_config.weight
 
-        # Add to category
+        # Store in all_checks dict for gate calculation
+        result.all_checks[check_name] = check_result
+
+        # Add to category (v1 compatibility)
         if check_def.category in result.category_scores:
             result.category_scores[check_def.category].checks.append(check_result)
             result.category_scores[check_def.category].total_checks += 1
@@ -169,19 +211,42 @@ def scan_repo(repo_path: Path, config: AuditConfig) -> RepoResult:
             else:
                 result.failed_checks.append(check_result)
 
-    # Calculate category scores
+        # Add to pillar (v2)
+        pillar_key = check_def.pillar or _get_pillar_for_category(check_def.category)
+        if pillar_key and pillar_key in result.pillar_scores:
+            result.pillar_scores[pillar_key].checks.append(check_name)
+            result.pillar_scores[pillar_key].total_checks += 1
+            if check_result.passed:
+                result.pillar_scores[pillar_key].passed_checks += 1
+
+    # Calculate category scores (v1 compatibility)
     for _category, cat_score in result.category_scores.items():
         if cat_score.total_checks > 0:
-            # Score is proportional to passed checks
-            pass_ratio = cat_score.passed_checks / cat_score.total_checks
+            # Score is proportional to passed checks (including partial)
+            total_score = sum(c.score for c in cat_score.checks)
+            pass_ratio = total_score / cat_score.total_checks
             cat_score.score = pass_ratio * cat_score.max_points
 
-    # Calculate total score
+    # Calculate pillar scores (v2)
+    for _pillar, pillar_score in result.pillar_scores.items():
+        if pillar_score.total_checks > 0:
+            pass_ratio = pillar_score.passed_checks / pillar_score.total_checks
+            pillar_score.score = pass_ratio * pillar_score.max_score
+
+    # Calculate total score (from categories for v1 compatibility)
     result.score_total = sum(cs.score for cs in result.category_scores.values())
     result.max_score = sum(cs.max_points for cs in result.category_scores.values())
 
-    # Determine level
+    # Determine v1 level
     result.level = get_level_for_score(result.score_total)
+
+    # Determine v2 maturity level and gates
+    maturity_level, gates = calculate_maturity_level(
+        result.score_total, result.all_checks
+    )
+    result.maturity_level = maturity_level.value
+    result.maturity_info = get_maturity_info(maturity_level)
+    result.gates = gates
 
     # Generate fix-first recommendations
     result.fix_first = generate_fix_first(result)
@@ -189,8 +254,25 @@ def scan_repo(repo_path: Path, config: AuditConfig) -> RepoResult:
     return result
 
 
+def _get_pillar_for_category(category: str) -> str | None:
+    """Get the primary pillar for a v1 category.
+
+    Args:
+        category: V1 category name.
+
+    Returns:
+        Primary pillar name, or None if not mapped.
+    """
+    pillars = CATEGORY_TO_PILLAR.get(category, [])
+    return pillars[0] if pillars else None
+
+
 def generate_fix_first(result: RepoResult) -> list[str]:
     """Generate fix-first recommendations based on failed checks.
+
+    Prioritizes:
+    1. Gate check failures for the next maturity level
+    2. Category failures in priority order
 
     Args:
         result: Repository audit result.
@@ -199,7 +281,26 @@ def generate_fix_first(result: RepoResult) -> list[str]:
         List of prioritized fix recommendations.
     """
     recommendations: list[str] = []
+    seen_suggestions: set[str] = set()
 
+    # First, prioritize gate failures for the next maturity level
+    current_level = result.maturity_level
+    next_level = current_level + 1
+
+    if next_level <= 5 and next_level in result.gates:
+        gate_status = result.gates[next_level]
+        if not gate_status.passed:
+            for check_name in gate_status.blocking_checks:
+                check_result = result.all_checks.get(check_name)
+                if (
+                    check_result
+                    and check_result.suggestion
+                    and check_result.suggestion not in seen_suggestions
+                ):
+                    recommendations.append(check_result.suggestion)
+                    seen_suggestions.add(check_result.suggestion)
+
+    # Then, add category-based recommendations
     for category, _fix_name in FIX_FIRST_PRIORITIES:
         if category in result.category_scores:
             cat_score = result.category_scores[category]
@@ -210,9 +311,10 @@ def generate_fix_first(result: RepoResult) -> list[str]:
                     if (
                         not check.passed
                         and check.suggestion
-                        and check.suggestion not in recommendations
+                        and check.suggestion not in seen_suggestions
                     ):
                         recommendations.append(check.suggestion)
+                        seen_suggestions.add(check.suggestion)
 
     return recommendations[:7]  # Limit to top 7 recommendations
 

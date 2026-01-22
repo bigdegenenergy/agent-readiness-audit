@@ -16,6 +16,7 @@ from agent_readiness_audit.checks.base import (
     name="gitignore_present",
     category="security_and_governance",
     description="Check if .gitignore file exists",
+    pillar="secret_hygiene",
 )
 def check_gitignore_present(repo_path: Path) -> CheckResult:
     """Check if .gitignore exists."""
@@ -49,6 +50,7 @@ def check_gitignore_present(repo_path: Path) -> CheckResult:
     name="env_example_or_secrets_docs_present",
     category="security_and_governance",
     description="Check if environment variable documentation exists",
+    pillar="secret_hygiene",
 )
 def check_env_example_or_secrets_docs_present(repo_path: Path) -> CheckResult:
     """Check if env example or secrets documentation exists."""
@@ -133,6 +135,7 @@ def check_env_example_or_secrets_docs_present(repo_path: Path) -> CheckResult:
     name="security_policy_present_or_baseline",
     category="security_and_governance",
     description="Check if security policy or baseline documentation exists",
+    pillar="secret_hygiene",
 )
 def check_security_policy_present_or_baseline(repo_path: Path) -> CheckResult:
     """Check if security policy exists."""

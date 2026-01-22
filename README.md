@@ -6,21 +6,32 @@
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 [![Type checked: mypy](https://img.shields.io/badge/type%20checked-mypy-blue.svg)](https://mypy-lang.org/)
 
-**A CLI tool that audits repositories for agent-readiness and outputs human + machine-readable reports.**
+**Certify Technical Readiness for Autonomous Coding Agents**
 
-Agent Readiness Audit (`ara`) helps you understand how well your repositories are prepared for AI agents to work with them autonomously. It analyzes your codebase across 8 key dimensions and provides actionable recommendations to improve agent compatibility.
+Agent Readiness Audit (`ara`) analyzes repositories to determine how well they support AI agents working autonomously. It provides a **5-level maturity certification** with evidence-backed scoring and actionable fix-first recommendations.
 
-## What is Agent Readiness?
+## Why Agent Readiness Matters
 
-Agent readiness measures how well a repository supports autonomous AI agents in performing development tasks. A highly agent-ready repository has clear documentation, reproducible builds, comprehensive tests, and strong guardrails that help agents understand, modify, and validate code changes safely.
+AI coding agents work differently from human developers:
 
-The concept recognizes that AI agents work differently from human developers. They benefit from explicit instructions, deterministic environments, fast feedback loops, and clear boundaries. A repository optimized for agent readiness enables AI to contribute more effectively while reducing the risk of errors.
+- They need **explicit instructions** rather than tribal knowledge
+- They require **deterministic environments** with reproducible builds
+- They benefit from **fast feedback loops** to validate changes quickly
+- They rely on **typed contracts** and structured documentation
 
-## Why This Exists
+A repository optimized for agent readiness becomes a **deterministic API surface** that enables reliable autonomous development while reducing errors and human intervention.
 
-As AI agents become more capable of writing and modifying code, the quality of your repository's "developer experience" directly impacts how effectively agents can work with it. This tool helps you identify gaps and prioritize improvements that will make your codebase more accessible to both human and AI contributors.
+## The 5-Level Maturity Model
 
-Key benefits include faster agent onboarding, more reliable automated changes, reduced need for human intervention, and better overall code quality through improved documentation and testing practices.
+| Level | Name             | Description                                                        |
+| ----- | ---------------- | ------------------------------------------------------------------ |
+| **1** | **Functional**   | Works for humans; agents fail due to ambiguity                     |
+| **2** | **Documented**   | Setup/run instructions exist; agents can attempt tasks             |
+| **3** | **Standardized** | CI, linting, tests, deterministic deps; minimum viable for agents  |
+| **4** | **Optimized**    | Fast feedback loops; split tests; strong local guardrails          |
+| **5** | **Autonomous**   | Telemetry + evals + golden datasets; full agent-native environment |
+
+> **Note**: Level 3 is the minimum recommended for production agent workflows.
 
 ## Installation
 
@@ -44,39 +55,123 @@ cd agent-readiness-audit
 uv sync
 ```
 
-## Quickstart
-
-Scan a single repository:
+## Quick Start
 
 ```bash
+# Scan current directory
 ara scan --repo .
-```
 
-Scan multiple repositories:
+# Scan with detailed markdown output
+ara scan --repo . --format markdown
 
-```bash
-ara scan --root ~/code --depth 2 --out ./out
-```
+# Scan multiple repositories
+ara scan --root ~/projects --depth 2
 
-Generate a configuration file:
+# Generate output artifacts
+ara scan --repo . --out ./reports
 
-```bash
-ara init-config --out ./.agent_readiness_audit.toml
-```
+# Strict mode (fail if below threshold)
+ara scan --repo . --strict --min-score 10
 
-## Configuration
-
-Agent Readiness Audit can be customized via a TOML configuration file. By default, it looks for `.agent_readiness_audit.toml` in the current directory or parent directories.
-
-Generate a starter configuration:
-
-```bash
+# Generate configuration file
 ara init-config
 ```
 
-The configuration allows you to customize scoring weights, enable/disable specific checks, adjust detection patterns, and set minimum passing scores for strict mode.
+## Example Output
 
-Example configuration:
+```
+Agent Readiness Audit Report
+
+Repository: my-project
+Score: 12/16 (75%)
+Maturity Level: Level 3 - Standardized
+
+Gate Status:
+  Level 2: PASSED
+  Level 3: PASSED
+  Level 4: BLOCKED (precommit_present, machine_readable_coverage)
+  Level 5: NOT REACHED
+
+Fix-First Recommendations:
+  1. Add .pre-commit-config.yaml with ruff + mypy hooks
+  2. Enable coverage.xml output in pytest configuration
+  3. Add test-unit and test-integration Makefile targets
+```
+
+## Scoring Pillars
+
+ARA v2 evaluates repositories across **15 pillars** grouped into domains:
+
+### Environment & Determinism
+
+- **Environment Determinism**: Dependency manifests, lockfiles, runtime version pinning
+- **Fast Guardrails**: Linters (ruff), formatters, pre-commit hooks
+
+### Type Safety
+
+- **Type Contracts**: Type hint coverage, mypy strictness configuration
+
+### Verification
+
+- **Verification Trust**: Test presence, CI enforcement, flakiness awareness
+- **Verification Speed**: Test splitting, timeouts, parallel execution
+
+### Documentation
+
+- **Documentation Structure**: Diátaxis-aligned organization
+- **Inline Documentation**: Docstring coverage
+- **Contribution Contract**: CONTRIBUTING.md, templates
+
+### Security
+
+- **Agentic Security**: Prompt red-teaming (promptfoo)
+- **Secret Hygiene**: .gitignore, .env patterns, secret scanning
+
+### Observability
+
+- **Telemetry & Tracing**: OpenTelemetry instrumentation
+- **Structured Logging**: JSON logs, standard fields
+
+### Evaluation
+
+- **Eval Frameworks**: DeepEval, Ragas integration
+- **Golden Datasets**: Test cases with expected outcomes
+
+### Distribution
+
+- **Distribution DX**: README quality, setup instructions
+
+## Level Requirements (Gates)
+
+Each maturity level requires passing specific "gate" checks:
+
+### Level 3 (Standardized) - Minimum for Production Agents
+
+- README with setup and test instructions
+- Dependency manifest and lockfile
+- CI workflow that runs tests and linting
+- Linter configuration
+
+### Level 4 (Optimized) - Fast Feedback Loops
+
+- Pre-commit hooks configured
+- Fast linter (ruff for Python)
+- 70%+ type hint coverage
+- Machine-readable coverage output
+- Test splitting (unit/integration)
+
+### Level 5 (Autonomous) - Full Agent-Native
+
+- 85%+ type hint coverage
+- OpenTelemetry instrumentation
+- Structured logging (structlog/JSON)
+- Eval framework integration
+- Golden dataset for regression testing
+- Prompt testing (promptfoo)
+
+## Configuration
+
+ARA can be customized via `.agent_readiness_audit.toml`:
 
 ```toml
 [scoring]
@@ -89,68 +184,25 @@ max_points = 2
 
 [checks]
 readme_exists = { enabled = true, weight = 1.0 }
+python_type_hint_coverage = { enabled = true, threshold_level_4 = 70, threshold_level_5 = 85 }
+
+[output]
+default_format = "table"
+show_evidence = true
+show_gates = true
 ```
 
-## Scoring Model
+Generate a starter config:
 
-Repositories are scored on a 0-16 point scale across 8 categories, each worth up to 2 points.
-
-| Category              | Description                            | Max Points |
-| --------------------- | -------------------------------------- | ---------- |
-| Discoverability       | README presence and onboarding clarity | 2          |
-| Deterministic Setup   | Reproducible dependency management     | 2          |
-| Build and Run         | Standard commands for build/test/lint  | 2          |
-| Test Feedback Loop    | Test infrastructure and runnability    | 2          |
-| Static Guardrails     | Linting, formatting, type checking     | 2          |
-| Observability         | Logging and error handling             | 2          |
-| CI Enforcement        | Continuous integration configuration   | 2          |
-| Security & Governance | Security policies and hygiene          | 2          |
-
-Scores map to readiness levels:
-
-| Score Range | Level               | Description                            |
-| ----------- | ------------------- | -------------------------------------- |
-| 0-5         | Human-Only Repo     | Requires significant human guidance    |
-| 6-9         | Assisted Agent      | Agents can help with supervision       |
-| 10-13       | Semi-Autonomous     | Agents can work with minimal oversight |
-| 14-16       | Agent-Ready Factory | Fully optimized for autonomous agents  |
-
-## Adding Checks (Plugin Model)
-
-New checks can be added by creating a function decorated with `@check`:
-
-```python
-from pathlib import Path
-from agent_readiness_audit.checks.base import CheckResult, check
-
-@check(
-    name="my_custom_check",
-    category="discoverability",
-    description="Check for custom requirement"
-)
-def check_my_custom_thing(repo_path: Path) -> CheckResult:
-    # Your check logic here
-    if (repo_path / "CUSTOM_FILE.md").exists():
-        return CheckResult(
-            passed=True,
-            evidence="Found CUSTOM_FILE.md"
-        )
-    return CheckResult(
-        passed=False,
-        evidence="CUSTOM_FILE.md not found",
-        suggestion="Add a CUSTOM_FILE.md to document custom requirements."
-    )
+```bash
+ara init-config
 ```
-
-Register your check in the appropriate category's `__init__.py` and it will be automatically included in scans.
 
 ## Output Formats
 
-Agent Readiness Audit supports multiple output formats.
-
 ### Table (default)
 
-Human-readable terminal output with colors and formatting:
+Human-readable terminal output with colors:
 
 ```bash
 ara scan --repo . --format table
@@ -158,7 +210,7 @@ ara scan --repo . --format table
 
 ### JSON
 
-Machine-readable JSON for integration with other tools:
+Machine-readable for CI integration:
 
 ```bash
 ara scan --repo . --format json
@@ -166,7 +218,7 @@ ara scan --repo . --format json
 
 ### Markdown
 
-Documentation-ready Markdown reports:
+Documentation-ready reports:
 
 ```bash
 ara scan --repo . --format markdown
@@ -174,7 +226,7 @@ ara scan --repo . --format markdown
 
 ### Artifacts
 
-Write all formats to an output directory:
+Write all formats to directory:
 
 ```bash
 ara scan --repo . --out ./reports
@@ -185,17 +237,15 @@ ara scan --repo . --out ./reports
 
 ### `ara scan`
 
-Scan one or more repositories for agent readiness.
-
 ```
 Options:
-  --repo, -r PATH       Path to a single repository
+  --repo, -r PATH       Path to a single repository (default: CWD)
   --root PATH           Path containing multiple repositories
   --depth, -d INT       Max search depth under --root (default: 2)
   --include, -i TEXT    Glob pattern to include repos
   --exclude, -e TEXT    Glob pattern to exclude repos
   --config, -c PATH     Path to config TOML file
-  --format, -f FORMAT   Output format: table, json, markdown
+  --format, -f FORMAT   Output: table, json, markdown (default: table)
   --out, -o PATH        Output directory for artifacts
   --strict, -s          Exit non-zero if below minimum score
   --min-score INT       Override minimum passing score (0-16)
@@ -203,59 +253,84 @@ Options:
 
 ### `ara report`
 
-Render a report from previously saved JSON results.
+Render from saved JSON:
 
 ```
 Options:
-  --input, -i PATH      Input JSON file from scan
-  --format, -f FORMAT   Output format: table, markdown
+  --input, -i PATH      Input JSON from previous scan
+  --format, -f FORMAT   Output: table, markdown
 ```
 
 ### `ara init-config`
 
-Generate a starter configuration file.
+Generate configuration file:
 
 ```
 Options:
   --out, -o PATH        Output path (default: ./.agent_readiness_audit.toml)
 ```
 
-## Roadmap
+## No-Gaming Principles
 
-The following features are planned for future releases:
+ARA is designed to encourage meaningful improvements, not checkbox compliance:
 
-- Additional language-specific checks (Go, Rust, Java)
-- Integration with popular CI/CD platforms
-- Web dashboard for visualizing results over time
-- GitHub Action for automated PR checks
-- VS Code extension for real-time feedback
-- Custom check plugin system with external packages
+1. **Checks verify actual readiness**, not just file presence
+2. **Evidence is required** for every pass/fail determination
+3. **Scores cannot be inflated** through ceremonial configs
+4. **Gates enforce real requirements**, not superficial ones
+5. **Fix recommendations are actionable**, not generic
 
-## Contributing
+If a check passes, your repository genuinely supports that capability for agents.
 
-Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+## Backward Compatibility
 
-### Development Setup
+ARA v2 maintains full backward compatibility with v1:
+
+- **Same 0-16 score scale**
+- **Same CLI interface**
+- **Same output formats**
+- **V1 levels map to v2**: Human-Only (L1), Assisted (L2), Semi-Autonomous (L3), Agent-Ready (L4-5)
+
+The v2 maturity model and pillars are additions, not replacements.
+
+## Development
 
 ```bash
-# Clone the repository
+# Clone
 git clone https://github.com/bigdegenenergy/agent-readiness-audit.git
 cd agent-readiness-audit
 
 # Install dependencies
 uv sync
 
-# Install pre-commit hooks
-uv run pre-commit install
-
 # Run tests
 uv run pytest
 
-# Run linting
-uv run ruff check .
+# Lint and format
+uv run ruff check . && uv run ruff format .
+
+# Type check
 uv run mypy agent_readiness_audit
+
+# Run the tool
+uv run ara scan --repo .
 ```
+
+## Specification
+
+For the complete check specifications, scoring algorithm, and contribution guidelines, see [AGENTS.md](AGENTS.md).
+
+## Contributing
+
+Contributions welcome! Please:
+
+1. Read [AGENTS.md](AGENTS.md) for check specifications
+2. Run tests: `uv run pytest`
+3. Run linting: `uv run ruff check . && uv run ruff format --check .`
+4. Run type checking: `uv run mypy agent_readiness_audit`
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 
 ## License
 
-This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
+MIT License - see [LICENSE](LICENSE) for details.

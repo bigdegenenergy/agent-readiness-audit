@@ -1,5 +1,9 @@
 """Check implementations for Agent Readiness Audit."""
 
+from agent_readiness_audit.checks.agentic_security import (
+    check_prompt_secret_scanning,
+    check_promptfoo_present,
+)
 from agent_readiness_audit.checks.base import CheckResult, check, get_all_checks
 from agent_readiness_audit.checks.build_and_run import (
     check_documented_commands_present,
@@ -20,6 +24,18 @@ from agent_readiness_audit.checks.discoverability import (
     check_readme_has_setup_section,
     check_readme_has_test_instructions,
 )
+from agent_readiness_audit.checks.documentation import (
+    check_diataxis_structure,
+    check_docstring_coverage_python,
+)
+from agent_readiness_audit.checks.evals import (
+    check_eval_framework_detect,
+    check_golden_dataset_present,
+)
+from agent_readiness_audit.checks.fast_guardrails import (
+    check_fast_linter_python,
+    check_precommit_present,
+)
 from agent_readiness_audit.checks.observability import (
     check_logging_present,
     check_structured_errors_present,
@@ -34,10 +50,23 @@ from agent_readiness_audit.checks.static_guardrails import (
     check_linter_config_present,
     check_typecheck_config_present,
 )
+from agent_readiness_audit.checks.telemetry import (
+    check_opentelemetry_present,
+    check_structured_logging_present,
+)
 from agent_readiness_audit.checks.test_feedback_loop import (
     check_test_command_detectable,
     check_test_command_has_timeout,
     check_tests_directory_or_config_exists,
+)
+from agent_readiness_audit.checks.type_contracts import (
+    check_mypy_strictness,
+    check_python_type_hint_coverage,
+)
+from agent_readiness_audit.checks.verification import (
+    check_flake_awareness_pytest,
+    check_machine_readable_coverage,
+    check_test_splitting,
 )
 
 __all__ = [
@@ -64,6 +93,19 @@ __all__ = [
     "check_linter_config_present",
     "check_formatter_config_present",
     "check_typecheck_config_present",
+    # Fast Guardrails (v2)
+    "check_fast_linter_python",
+    "check_precommit_present",
+    # Type Contracts (v2)
+    "check_python_type_hint_coverage",
+    "check_mypy_strictness",
+    # Verification (v2)
+    "check_flake_awareness_pytest",
+    "check_machine_readable_coverage",
+    "check_test_splitting",
+    # Documentation (v2)
+    "check_diataxis_structure",
+    "check_docstring_coverage_python",
     # Observability
     "check_logging_present",
     "check_structured_errors_present",
@@ -74,4 +116,13 @@ __all__ = [
     "check_gitignore_present",
     "check_env_example_or_secrets_docs_present",
     "check_security_policy_present_or_baseline",
+    # Agentic Security (v2)
+    "check_promptfoo_present",
+    "check_prompt_secret_scanning",
+    # Telemetry (v2)
+    "check_opentelemetry_present",
+    "check_structured_logging_present",
+    # Eval Frameworks (v2)
+    "check_eval_framework_detect",
+    "check_golden_dataset_present",
 ]

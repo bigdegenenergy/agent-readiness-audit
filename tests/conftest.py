@@ -239,3 +239,233 @@ Please report security issues via GitHub's private vulnerability reporting.
     )
 
     return python_repo
+
+
+@pytest.fixture
+def v2_optimized_repo(agent_ready_repo: Path) -> Path:
+    """Create a v2-optimized repository with all Level 4+ checks passing.
+
+    This fixture extends agent_ready_repo with:
+    - Pre-commit configuration
+    - Type hints in source code
+    - Machine-readable coverage configuration
+    - Test splitting markers
+    - Docstrings on all public functions
+    """
+    # Add pre-commit config
+    (agent_ready_repo / ".pre-commit-config.yaml").write_text(
+        """repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.4.0
+    hooks:
+      - id: ruff
+      - id: ruff-format
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.10.0
+    hooks:
+      - id: mypy
+"""
+    )
+
+    # Add uv.lock for lockfile
+    (agent_ready_repo / "uv.lock").write_text("# Lockfile placeholder\n")
+
+    # Update pyproject.toml with strict mypy and coverage xml
+    pyproject = agent_ready_repo / "pyproject.toml"
+    pyproject.write_text(
+        """[project]
+name = "python-repo"
+version = "0.1.0"
+requires-python = ">=3.11"
+
+[tool.ruff]
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+disallow_untyped_defs = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "unit: unit tests",
+    "integration: integration tests",
+]
+addopts = "--cov=src --cov-report=xml --cov-report=term"
+
+[tool.coverage.report]
+xml = true
+
+[tool.coverage.xml]
+output = "coverage.xml"
+"""
+    )
+
+    # Update source code with type hints and docstrings
+    src_dir = agent_ready_repo / "src" / "python_repo"
+    (src_dir / "main.py").write_text(
+        '''"""Main module for the application."""
+
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+class AppError(Exception):
+    """Application-specific error class."""
+
+    pass
+
+
+def main() -> None:
+    """Start the application.
+
+    This is the main entry point for the application.
+    It initializes logging and performs startup tasks.
+    """
+    logger.info("Starting")
+
+
+def add(a: int, b: int) -> int:
+    """Add two numbers together.
+
+    Args:
+        a: First number.
+        b: Second number.
+
+    Returns:
+        The sum of a and b.
+    """
+    return a + b
+'''
+    )
+
+    # Update __init__.py with type hints
+    (src_dir / "__init__.py").write_text(
+        '''"""Python repo package."""
+
+__version__: str = "0.1.0"
+'''
+    )
+
+    # Add Makefile with test splitting
+    (agent_ready_repo / "Makefile").write_text(
+        """test:
+\tpytest
+
+test-unit:
+\tpytest -m unit
+
+test-integration:
+\tpytest -m integration
+
+lint:
+\truff check .
+
+format:
+\truff format .
+
+typecheck:
+\tmypy src
+"""
+    )
+
+    # Add docs directory with Diataxis structure
+    docs_dir = agent_ready_repo / "docs"
+    docs_dir.mkdir(exist_ok=True)
+    (docs_dir / "tutorials").mkdir(exist_ok=True)
+    (docs_dir / "how-to").mkdir(exist_ok=True)
+    (docs_dir / "reference").mkdir(exist_ok=True)
+    (docs_dir / "explanation").mkdir(exist_ok=True)
+    (docs_dir / "tutorials" / "quickstart.md").write_text("# Quickstart Tutorial\n")
+    (docs_dir / "how-to" / "setup.md").write_text("# How to Set Up\n")
+    (docs_dir / "reference" / "api.md").write_text("# API Reference\n")
+    (docs_dir / "explanation" / "architecture.md").write_text("# Architecture\n")
+
+    return agent_ready_repo
+
+
+@pytest.fixture
+def llm_project_repo(v2_optimized_repo: Path) -> Path:
+    """Create an LLM/agent project repository.
+
+    This fixture extends v2_optimized_repo with:
+    - OpenTelemetry dependencies
+    - Structured logging (structlog)
+    - DeepEval for evaluation
+    - Golden test datasets
+    - Promptfoo configuration
+    """
+    # Update pyproject.toml with LLM dependencies
+    pyproject = v2_optimized_repo / "pyproject.toml"
+    content = pyproject.read_text()
+    content = content.replace(
+        'requires-python = ">=3.11"',
+        """requires-python = ">=3.11"
+dependencies = [
+    "openai",
+    "opentelemetry-sdk",
+    "opentelemetry-api",
+    "structlog",
+    "deepeval",
+]""",
+    )
+    pyproject.write_text(content)
+
+    # Add promptfoo config
+    (v2_optimized_repo / "promptfooconfig.yaml").write_text(
+        """description: Prompt testing suite
+prompts:
+  - prompts/system.txt
+providers:
+  - openai:gpt-4
+tests:
+  - vars:
+      input: "Hello"
+    assert:
+      - type: contains
+        value: "Hello"
+"""
+    )
+
+    # Add prompts directory
+    prompts_dir = v2_optimized_repo / "prompts"
+    prompts_dir.mkdir(exist_ok=True)
+    (prompts_dir / "system.txt").write_text("You are a helpful assistant.\n")
+
+    # Add golden test datasets
+    evals_dir = v2_optimized_repo / "evals"
+    evals_dir.mkdir(exist_ok=True)
+    (evals_dir / "golden_cases.json").write_text(
+        """[
+  {"input": "Hello", "expected_output": "Hi there!"},
+  {"input": "What is 2+2?", "expected_output": "4"}
+]
+"""
+    )
+
+    # Add tests/data with golden datasets
+    test_data = v2_optimized_repo / "tests" / "data"
+    test_data.mkdir(exist_ok=True)
+    (test_data / "golden_inputs.json").write_text(
+        """[
+  {"query": "What is Python?", "expected_contains": "programming language"}
+]
+"""
+    )
+
+    # Add gitleaks config for secret scanning
+    (v2_optimized_repo / ".gitleaks.toml").write_text(
+        """title = "Gitleaks config"
+[rules]
+"""
+    )
+
+    return v2_optimized_repo

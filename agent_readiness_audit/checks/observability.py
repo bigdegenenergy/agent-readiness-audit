@@ -16,6 +16,7 @@ from agent_readiness_audit.checks.base import (
     name="logging_present",
     category="observability",
     description="Check if logging infrastructure is present",
+    pillar="structured_logging_cost",
 )
 def check_logging_present(repo_path: Path) -> CheckResult:
     """Check if logging is configured."""
@@ -95,6 +96,7 @@ def check_logging_present(repo_path: Path) -> CheckResult:
     name="structured_errors_present",
     category="observability",
     description="Check if structured error handling is present",
+    pillar="structured_logging_cost",
 )
 def check_structured_errors_present(repo_path: Path) -> CheckResult:
     """Check if structured error handling exists."""

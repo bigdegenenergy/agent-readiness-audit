@@ -51,6 +51,8 @@ ALL_LOCKFILES = (
     name="dependency_manifest_exists",
     category="deterministic_setup",
     description="Check if a dependency manifest file exists",
+    pillar="environment_determinism",
+    gate_for=[2],
 )
 def check_dependency_manifest_exists(repo_path: Path) -> CheckResult:
     """Check if dependency manifest exists."""
@@ -71,6 +73,8 @@ def check_dependency_manifest_exists(repo_path: Path) -> CheckResult:
     name="lockfile_exists",
     category="deterministic_setup",
     description="Check if a dependency lock file exists for reproducible builds",
+    pillar="environment_determinism",
+    gate_for=[3],
 )
 def check_lockfile_exists(repo_path: Path) -> CheckResult:
     """Check if lock file exists."""
@@ -101,6 +105,7 @@ def check_lockfile_exists(repo_path: Path) -> CheckResult:
     name="runtime_version_declared",
     category="deterministic_setup",
     description="Check if runtime/language version is explicitly declared",
+    pillar="environment_determinism",
 )
 def check_runtime_version_declared(repo_path: Path) -> CheckResult:
     """Check if runtime version is declared."""

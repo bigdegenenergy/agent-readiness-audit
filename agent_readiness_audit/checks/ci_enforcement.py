@@ -34,6 +34,8 @@ CI_PATHS = [
     name="ci_workflow_present",
     category="ci_enforcement",
     description="Check if CI workflow configuration exists",
+    pillar="verification_trust",
+    gate_for=[3],
 )
 def check_ci_workflow_present(repo_path: Path) -> CheckResult:
     """Check if CI is configured."""
@@ -84,6 +86,7 @@ def check_ci_workflow_present(repo_path: Path) -> CheckResult:
     name="ci_runs_tests_or_lint",
     category="ci_enforcement",
     description="Check if CI runs tests or linting",
+    pillar="verification_trust",
 )
 def check_ci_runs_tests_or_lint(repo_path: Path) -> CheckResult:
     """Check if CI runs tests or lint."""

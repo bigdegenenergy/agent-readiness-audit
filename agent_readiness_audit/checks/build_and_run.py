@@ -35,6 +35,7 @@ TASK_RUNNERS = [
     name="make_or_task_runner_exists",
     category="build_and_run",
     description="Check if a task runner (Makefile, Taskfile, etc.) exists",
+    pillar="fast_guardrails",
 )
 def check_make_or_task_runner_exists(repo_path: Path) -> CheckResult:
     """Check if task runner exists."""
@@ -55,6 +56,7 @@ def check_make_or_task_runner_exists(repo_path: Path) -> CheckResult:
     name="package_scripts_or_equivalent",
     category="build_and_run",
     description="Check if package scripts or equivalent automation exists",
+    pillar="fast_guardrails",
 )
 def check_package_scripts_or_equivalent(repo_path: Path) -> CheckResult:
     """Check if package scripts exist."""
@@ -103,6 +105,7 @@ def check_package_scripts_or_equivalent(repo_path: Path) -> CheckResult:
     name="documented_commands_present",
     category="build_and_run",
     description="Check if common commands are documented or discoverable",
+    pillar="distribution_dx",
 )
 def check_documented_commands_present(repo_path: Path) -> CheckResult:
     """Check if commands are documented."""
