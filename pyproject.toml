@@ -46,6 +46,7 @@ dependencies = [
 dev = [
     "pytest>=8.0.0",
     "pytest-cov>=4.1.0",
+    "pytest-timeout>=2.3.0",
     "ruff>=0.6.0",
     "mypy>=1.10.0",
     "pre-commit>=3.7.0",
@@ -133,6 +134,7 @@ markers = [
     "slow: marks tests as slow",
     "integration: marks tests as integration tests",
 ]
+timeout = 60
 
 [tool.coverage.run]
 source = ["agent_readiness_audit"]
