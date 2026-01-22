@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import ast
-import re
+import configparser
+import tomllib
 from pathlib import Path
 
 from agent_readiness_audit.checks.base import (
@@ -171,6 +172,41 @@ def check_python_type_hint_coverage(repo_path: Path) -> CheckResult:
         )
 
 
+def _parse_ini_bool(value: str) -> bool:
+    """Parse a boolean value from INI file (case-insensitive)."""
+    return value.lower() in ("true", "yes", "1", "on")
+
+
+def _check_mypy_ini_config(
+    config: configparser.ConfigParser,
+) -> tuple[bool, str] | None:
+    """Check mypy config in a ConfigParser object.
+
+    Returns:
+        Tuple of (is_strict, evidence) if mypy section found, None otherwise.
+    """
+    if "mypy" not in config:
+        return None
+
+    mypy_config = config["mypy"]
+
+    # Check for strict mode
+    if mypy_config.get("strict", "").lower() in ("true", "yes", "1", "on"):
+        return True, "strict mode enabled"
+
+    # Check for disallow_untyped_defs as alternative strict indicator
+    if mypy_config.get("disallow_untyped_defs", "").lower() in (
+        "true",
+        "yes",
+        "1",
+        "on",
+    ):
+        return True, "disallow_untyped_defs enabled"
+
+    # mypy configured but not strict
+    return False, "configured but not strict"
+
+
 @check(
     name="mypy_strictness",
     category="static_guardrails",
@@ -184,71 +220,89 @@ def check_mypy_strictness(repo_path: Path) -> CheckResult:
     Pass if:
     - mypy.ini or pyproject.toml contains strict = true
     - OR disallow_untyped_defs = true
+
+    Uses proper TOML/INI parsing to avoid matching commented-out lines.
     """
-    # Check pyproject.toml
+    # Check pyproject.toml using tomllib
     pyproject = file_exists(repo_path, "pyproject.toml")
     if pyproject:
         content = read_file_safe(pyproject)
-        if content and "[tool.mypy]" in content:
-            # Use regex to handle variable whitespace (strict = true, strict=true, etc.)
-            if re.search(r"strict\s*=\s*true", content, re.IGNORECASE):
-                return CheckResult(
-                    passed=True,
-                    evidence=f"mypy strict mode enabled in {pyproject.name}",
-                )
-            if re.search(r"disallow_untyped_defs\s*=\s*true", content, re.IGNORECASE):
-                return CheckResult(
-                    passed=True,
-                    evidence=f"mypy disallow_untyped_defs enabled in {pyproject.name}",
-                )
-            # mypy configured but not strict
-            return CheckResult(
-                passed=False,
-                partial=True,
-                evidence=f"mypy configured in {pyproject.name} but not strict",
-                suggestion="Add 'strict = true' to [tool.mypy] in pyproject.toml",
-            )
+        if content:
+            try:
+                data = tomllib.loads(content)
+                mypy_config = data.get("tool", {}).get("mypy", {})
+                if mypy_config:
+                    # Check for strict mode
+                    if mypy_config.get("strict") is True:
+                        return CheckResult(
+                            passed=True,
+                            evidence=f"mypy strict mode enabled in {pyproject.name}",
+                        )
+                    # Check for disallow_untyped_defs
+                    if mypy_config.get("disallow_untyped_defs") is True:
+                        return CheckResult(
+                            passed=True,
+                            evidence=f"mypy disallow_untyped_defs enabled in {pyproject.name}",
+                        )
+                    # mypy configured but not strict
+                    return CheckResult(
+                        passed=False,
+                        partial=True,
+                        evidence=f"mypy configured in {pyproject.name} but not strict",
+                        suggestion="Add 'strict = true' to [tool.mypy] in pyproject.toml",
+                    )
+            except tomllib.TOMLDecodeError:
+                pass  # Invalid TOML, try other config files
 
-    # Check mypy.ini
+    # Check mypy.ini using configparser
     mypy_ini = file_exists(repo_path, "mypy.ini")
     if mypy_ini:
         content = read_file_safe(mypy_ini)
         if content:
-            # Use regex to handle variable whitespace
-            if re.search(r"strict\s*=\s*True", content, re.IGNORECASE):
-                return CheckResult(
-                    passed=True,
-                    evidence="mypy strict mode enabled in mypy.ini",
-                )
-            if re.search(r"disallow_untyped_defs\s*=\s*True", content, re.IGNORECASE):
-                return CheckResult(
-                    passed=True,
-                    evidence="mypy disallow_untyped_defs enabled in mypy.ini",
-                )
-            return CheckResult(
-                passed=False,
-                partial=True,
-                evidence="mypy.ini exists but strict mode not enabled",
-                suggestion="Add 'strict = True' to mypy.ini",
-            )
+            config = configparser.ConfigParser()
+            try:
+                config.read_string(content)
+                result = _check_mypy_ini_config(config)
+                if result is not None:
+                    is_strict, detail = result
+                    if is_strict:
+                        return CheckResult(
+                            passed=True,
+                            evidence=f"mypy {detail} in mypy.ini",
+                        )
+                    return CheckResult(
+                        passed=False,
+                        partial=True,
+                        evidence=f"mypy.ini exists but {detail}",
+                        suggestion="Add 'strict = True' to mypy.ini",
+                    )
+            except configparser.Error:
+                pass  # Invalid INI, continue
 
-    # Check setup.cfg
+    # Check setup.cfg using configparser
     setup_cfg = file_exists(repo_path, "setup.cfg")
     if setup_cfg:
         content = read_file_safe(setup_cfg)
-        if content and "[mypy]" in content:
-            # Use regex to handle variable whitespace
-            if re.search(r"strict\s*=\s*True", content, re.IGNORECASE):
-                return CheckResult(
-                    passed=True,
-                    evidence="mypy strict mode enabled in setup.cfg",
-                )
-            return CheckResult(
-                passed=False,
-                partial=True,
-                evidence="mypy configured in setup.cfg but not strict",
-                suggestion="Add 'strict = True' to [mypy] in setup.cfg",
-            )
+        if content:
+            config = configparser.ConfigParser()
+            try:
+                config.read_string(content)
+                result = _check_mypy_ini_config(config)
+                if result is not None:
+                    is_strict, detail = result
+                    if is_strict:
+                        return CheckResult(
+                            passed=True,
+                            evidence=f"mypy {detail} in setup.cfg",
+                        )
+                    return CheckResult(
+                        passed=False,
+                        partial=True,
+                        evidence=f"mypy configured in setup.cfg but {detail}",
+                        suggestion="Add 'strict = True' to [mypy] in setup.cfg",
+                    )
+            except configparser.Error:
+                pass  # Invalid INI, continue
 
     # No mypy configuration found
     # Check if this is a Python project

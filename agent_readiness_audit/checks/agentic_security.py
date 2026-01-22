@@ -102,8 +102,8 @@ def check_prompt_secret_scanning(repo_path: Path) -> CheckResult:
             evidence="trufflehog configured for secret scanning",
         )
 
-    # Directories to scan for prompts
-    prompt_dirs = ["prompt", "prompts", "templates", "prompt_templates"]
+    # Directory names to scan for prompts (searched recursively)
+    prompt_dir_names = {"prompt", "prompts", "templates", "prompt_templates"}
 
     # Patterns that indicate potential secrets
     # Note: Using word boundaries (\b) to avoid false positives on kebab-case identifiers
@@ -118,14 +118,25 @@ def check_prompt_secret_scanning(repo_path: Path) -> CheckResult:
         r"\bgho_[a-zA-Z0-9]{36}\b",  # GitHub OAuth token pattern
     ]
 
+    # Directories to exclude from search
+    exclude_dirs = {".venv", "venv", "node_modules", ".git", "__pycache__", ".tox"}
+
     suspicious_findings: list[tuple[str, str]] = []
+    found_prompt_dirs: list[Path] = []
 
-    for dir_name in prompt_dirs:
-        prompt_dir = repo_path / dir_name
-        if not prompt_dir.is_dir():
+    # Recursively find all prompt directories in the repo
+    for subdir in repo_path.rglob("*"):
+        if not subdir.is_dir():
             continue
+        # Skip excluded directories
+        if any(excl in subdir.parts for excl in exclude_dirs):
+            continue
+        # Check if directory name matches prompt patterns
+        if subdir.name.lower() in prompt_dir_names:
+            found_prompt_dirs.append(subdir)
 
-        # Scan files in prompt directories
+    # Scan files in found prompt directories
+    for prompt_dir in found_prompt_dirs:
         for file_path in prompt_dir.rglob("*"):
             if not file_path.is_file():
                 continue
@@ -148,8 +159,7 @@ def check_prompt_secret_scanning(repo_path: Path) -> CheckResult:
 
     if not suspicious_findings:
         # Also check if no prompt dirs exist (not applicable)
-        has_prompt_dirs = any((repo_path / d).is_dir() for d in prompt_dirs)
-        if not has_prompt_dirs:
+        if not found_prompt_dirs:
             return CheckResult(
                 passed=True,
                 evidence="No prompt template directories found; secret scan not applicable.",
