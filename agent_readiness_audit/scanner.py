@@ -9,11 +9,17 @@ from agent_readiness_audit.checks.base import (
     run_check,
 )
 from agent_readiness_audit.models import (
+    GATE_CHECKS,
     AuditConfig,
     CategoryScore,
+    GateStatus,
+    PillarScore,
     RepoResult,
     ScanSummary,
+    calculate_maturity_with_gates,
     get_level_for_score,
+    get_maturity_for_score,
+    get_maturity_name,
 )
 
 # Category order for consistent output
@@ -39,6 +45,25 @@ CATEGORY_DESCRIPTIONS = {
     "ci_enforcement": "CI exists and validates changes",
     "security_and_governance": "Baseline hygiene around secrets and contribution policy",
 }
+
+# v2: Pillar order for consistent output
+PILLAR_ORDER = [
+    "environment_determinism",
+    "fast_guardrails",
+    "type_contracts",
+    "verification_trust",
+    "verification_speed",
+    "documentation_structure",
+    "inline_documentation",
+    "contribution_contract",
+    "agentic_security",
+    "secret_hygiene",
+    "telemetry_tracing",
+    "structured_logging_cost",
+    "eval_frameworks",
+    "golden_datasets",
+    "distribution_dx",
+]
 
 # Fix-first priority mapping
 FIX_FIRST_PRIORITIES = [
@@ -139,6 +164,16 @@ def scan_repo(repo_path: Path, config: AuditConfig) -> RepoResult:
             max_points=cat_config.max_points if cat_config else 2.0,
         )
 
+    # Initialize pillar scores (v2)
+    for pillar in PILLAR_ORDER:
+        result.pillar_scores[pillar] = PillarScore(
+            name=pillar,
+            max_points=2.0,  # All pillars have max 2 points for now
+        )
+
+    # Track check results by name for gate evaluation
+    check_results: dict[str, bool] = {}
+
     # Run all checks
     all_checks = get_all_checks()
     for check_name, check_def in all_checks.items():
@@ -159,6 +194,9 @@ def scan_repo(repo_path: Path, config: AuditConfig) -> RepoResult:
         if check_config:
             check_result.weight = check_config.weight
 
+        # Track result for gate evaluation
+        check_results[check_name] = check_result.passed
+
         # Add to category
         if check_def.category in result.category_scores:
             result.category_scores[check_def.category].checks.append(check_result)
@@ -169,6 +207,14 @@ def scan_repo(repo_path: Path, config: AuditConfig) -> RepoResult:
             else:
                 result.failed_checks.append(check_result)
 
+        # Add to pillar (v2)
+        pillar_name = check_def.pillar or check_def.category
+        if pillar_name in result.pillar_scores:
+            result.pillar_scores[pillar_name].checks.append(check_name)
+            result.pillar_scores[pillar_name].total_checks += 1
+            if check_result.passed:
+                result.pillar_scores[pillar_name].passed_checks += 1
+
     # Calculate category scores
     for _category, cat_score in result.category_scores.items():
         if cat_score.total_checks > 0:
@@ -176,12 +222,28 @@ def scan_repo(repo_path: Path, config: AuditConfig) -> RepoResult:
             pass_ratio = cat_score.passed_checks / cat_score.total_checks
             cat_score.score = pass_ratio * cat_score.max_points
 
+    # Calculate pillar scores (v2)
+    for _pillar, pillar_score in result.pillar_scores.items():
+        if pillar_score.total_checks > 0:
+            pass_ratio = pillar_score.passed_checks / pillar_score.total_checks
+            pillar_score.score = pass_ratio * pillar_score.max_points
+
     # Calculate total score
     result.score_total = sum(cs.score for cs in result.category_scores.values())
     result.max_score = sum(cs.max_points for cs in result.category_scores.values())
 
-    # Determine level
+    # Determine v1 level (for backward compatibility)
     result.level = get_level_for_score(result.score_total)
+
+    # Calculate gate status (v2)
+    result.gates = calculate_gates(check_results)
+
+    # Determine v2 maturity level
+    score_based_level = get_maturity_for_score(result.score_total)
+    result.maturity_level = calculate_maturity_with_gates(
+        score_based_level, result.gates
+    )
+    result.maturity_name = get_maturity_name(result.maturity_level)
 
     # Generate fix-first recommendations
     result.fix_first = generate_fix_first(result)
@@ -189,8 +251,41 @@ def scan_repo(repo_path: Path, config: AuditConfig) -> RepoResult:
     return result
 
 
+def calculate_gates(check_results: dict[str, bool]) -> dict[str, GateStatus]:
+    """Calculate gate status for each maturity level.
+
+    Args:
+        check_results: Dictionary mapping check names to pass/fail status.
+
+    Returns:
+        Dictionary mapping level keys to GateStatus objects.
+    """
+    gates: dict[str, GateStatus] = {}
+
+    for level, required_checks in GATE_CHECKS.items():
+        gate_key = f"level_{level}"
+        failed_checks = [
+            check_name
+            for check_name in required_checks
+            if not check_results.get(check_name, False)
+        ]
+
+        gates[gate_key] = GateStatus(
+            level=level,
+            passed=len(failed_checks) == 0,
+            required_checks=required_checks,
+            failed_checks=failed_checks,
+        )
+
+    return gates
+
+
 def generate_fix_first(result: RepoResult) -> list[str]:
     """Generate fix-first recommendations based on failed checks.
+
+    Priority order:
+    1. Gate failures for next level (highest leverage)
+    2. Category failures by priority order
 
     Args:
         result: Repository audit result.
@@ -200,6 +295,21 @@ def generate_fix_first(result: RepoResult) -> list[str]:
     """
     recommendations: list[str] = []
 
+    # First, prioritize gate failures for next level
+    next_level = result.maturity_level + 1
+    if next_level <= 5:
+        gate_key = f"level_{next_level}"
+        if gate_key in result.gates and not result.gates[gate_key].passed:
+            # Add suggestions for failed gate checks
+            for check in result.failed_checks:
+                if (
+                    check.name in result.gates[gate_key].failed_checks
+                    and check.suggestion
+                    and check.suggestion not in recommendations
+                ):
+                    recommendations.append(check.suggestion)
+
+    # Then add remaining category-based recommendations
     for category, _fix_name in FIX_FIRST_PRIORITIES:
         if category in result.category_scores:
             cat_score = result.category_scores[category]

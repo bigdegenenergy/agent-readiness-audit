@@ -16,15 +16,112 @@ class CheckStatus(str, Enum):
     FAILED = "failed"
     UNKNOWN = "unknown"
     SKIPPED = "skipped"
+    PARTIAL = "partial"  # v2: for checks with partial compliance
 
 
 class ReadinessLevel(str, Enum):
-    """Agent readiness level based on score."""
+    """Agent readiness level based on score (v1 compatibility)."""
 
     HUMAN_ONLY = "Human-Only Repo"
     ASSISTED = "Assisted Agent"
     SEMI_AUTONOMOUS = "Semi-Autonomous"
     AGENT_READY = "Agent-Ready Factory"
+
+
+class MaturityLevel(int, Enum):
+    """Agent-native maturity level (v2)."""
+
+    FUNCTIONAL = 1
+    DOCUMENTED = 2
+    STANDARDIZED = 3
+    OPTIMIZED = 4
+    AUTONOMOUS = 5
+
+
+MATURITY_NAMES: dict[int, str] = {
+    1: "Functional",
+    2: "Documented",
+    3: "Standardized",
+    4: "Optimized",
+    5: "Autonomous",
+}
+
+MATURITY_DESCRIPTIONS: dict[int, str] = {
+    1: "Works for humans; agents fail due to ambiguity and missing automation.",
+    2: "Setup/run instructions exist; agents can attempt tasks but ambiguity remains.",
+    3: "CI, linting, basic tests, and deterministic deps exist; minimum viable for production agents.",
+    4: "Fast feedback loops; split test targets; strong local guardrails; predictable artifacts.",
+    5: "Telemetry + evals + golden datasets; agentic security posture; environment behaves like an API.",
+}
+
+
+class Pillar(str, Enum):
+    """v2 Pillars for granular analysis."""
+
+    ENVIRONMENT_DETERMINISM = "environment_determinism"
+    FAST_GUARDRAILS = "fast_guardrails"
+    TYPE_CONTRACTS = "type_contracts"
+    VERIFICATION_TRUST = "verification_trust"
+    VERIFICATION_SPEED = "verification_speed"
+    DOCUMENTATION_STRUCTURE = "documentation_structure"
+    INLINE_DOCUMENTATION = "inline_documentation"
+    CONTRIBUTION_CONTRACT = "contribution_contract"
+    AGENTIC_SECURITY = "agentic_security"
+    SECRET_HYGIENE = "secret_hygiene"
+    TELEMETRY_TRACING = "telemetry_tracing"
+    STRUCTURED_LOGGING_COST = "structured_logging_cost"
+    EVAL_FRAMEWORKS = "eval_frameworks"
+    GOLDEN_DATASETS = "golden_datasets"
+    DISTRIBUTION_DX = "distribution_dx"
+
+
+# Pillar to v1 category mapping for backward compatibility
+PILLAR_TO_CATEGORY: dict[str, str] = {
+    "environment_determinism": "deterministic_setup",
+    "fast_guardrails": "build_and_run",
+    "type_contracts": "static_guardrails",
+    "verification_trust": "test_feedback_loop",
+    "verification_speed": "test_feedback_loop",
+    "documentation_structure": "discoverability",
+    "inline_documentation": "discoverability",
+    "contribution_contract": "security_and_governance",
+    "agentic_security": "security_and_governance",
+    "secret_hygiene": "security_and_governance",
+    "telemetry_tracing": "observability",
+    "structured_logging_cost": "observability",
+    "eval_frameworks": "security_and_governance",
+    "golden_datasets": "security_and_governance",
+    "distribution_dx": "build_and_run",
+}
+
+
+# Gate checks for each maturity level
+GATE_CHECKS: dict[int, list[str]] = {
+    3: [  # Level 3 - Standardized
+        "dependency_manifest_exists",
+        "lockfile_exists",
+        "ci_workflow_present",
+        "linter_config_present",
+        "tests_directory_or_config_exists",
+        "readme_has_setup_section",
+        "readme_has_test_instructions",
+    ],
+    4: [  # Level 4 - Optimized
+        "precommit_present",
+        "fast_linter_python",
+        "machine_readable_coverage",
+        "test_splitting",
+        "python_type_hint_coverage",
+        "mypy_strictness",
+    ],
+    5: [  # Level 5 - Autonomous
+        "opentelemetry_present",
+        "structured_logging_present",
+        "eval_framework_detect",
+        "golden_dataset_present",
+        "promptfoo_present",
+    ],
+}
 
 
 class CheckResult(BaseModel):
@@ -36,11 +133,40 @@ class CheckResult(BaseModel):
     evidence: str = ""
     suggestion: str = ""
     weight: float = 1.0
+    pillar: str = ""  # v2: pillar this check belongs to
+    gate_level: int | None = None  # v2: if set, this is a gate for that level
 
     @property
     def passed(self) -> bool:
         """Return True if check passed."""
         return self.status == CheckStatus.PASSED
+
+
+class PillarScore(BaseModel):
+    """Score for a single v2 pillar."""
+
+    name: str
+    score: float = 0.0
+    max_points: float = 2.0
+    checks: list[str] = Field(default_factory=list)
+    passed_checks: int = 0
+    total_checks: int = 0
+
+    @property
+    def percentage(self) -> float:
+        """Return score as percentage."""
+        if self.max_points == 0:
+            return 0.0
+        return (self.score / self.max_points) * 100
+
+
+class GateStatus(BaseModel):
+    """Status of gate checks for a maturity level."""
+
+    level: int
+    passed: bool = True
+    required_checks: list[str] = Field(default_factory=list)
+    failed_checks: list[str] = Field(default_factory=list)
 
 
 class CategoryScore(BaseModel):
@@ -69,8 +195,12 @@ class RepoResult(BaseModel):
     repo_name: str
     score_total: float = 0.0
     max_score: float = 16.0
-    level: ReadinessLevel = ReadinessLevel.HUMAN_ONLY
+    level: ReadinessLevel = ReadinessLevel.HUMAN_ONLY  # v1 compatibility
+    maturity_level: int = 1  # v2: 1-5 scale
+    maturity_name: str = "Functional"  # v2: human-readable name
     category_scores: dict[str, CategoryScore] = Field(default_factory=dict)
+    pillar_scores: dict[str, PillarScore] = Field(default_factory=dict)  # v2
+    gates: dict[str, GateStatus] = Field(default_factory=dict)  # v2
     failed_checks: list[CheckResult] = Field(default_factory=list)
     passed_checks: list[CheckResult] = Field(default_factory=list)
     evidence: dict[str, Any] = Field(default_factory=dict)
@@ -94,6 +224,7 @@ class ScanSummary(BaseModel):
     repos: list[RepoResult] = Field(default_factory=list)
     average_score: float = 0.0
     level_distribution: dict[str, int] = Field(default_factory=dict)
+    maturity_distribution: dict[str, int] = Field(default_factory=dict)  # v2
 
     def calculate_summary(self) -> None:
         """Calculate summary statistics from repo results."""
@@ -103,11 +234,19 @@ class ScanSummary(BaseModel):
         self.total_repos = len(self.repos)
         self.average_score = sum(r.score_total for r in self.repos) / self.total_repos
 
-        # Count level distribution
+        # Count level distribution (v1)
         self.level_distribution = {}
         for repo in self.repos:
             level = repo.level.value
             self.level_distribution[level] = self.level_distribution.get(level, 0) + 1
+
+        # Count maturity distribution (v2)
+        self.maturity_distribution = {}
+        for repo in self.repos:
+            name = repo.maturity_name
+            self.maturity_distribution[name] = (
+                self.maturity_distribution.get(name, 0) + 1
+            )
 
 
 class ScoreLevelMapping(BaseModel):
@@ -131,6 +270,15 @@ class CheckConfig(BaseModel):
 
     enabled: bool = True
     weight: float = 1.0
+
+
+class ThresholdConfig(BaseModel):
+    """Configuration for v2 thresholds."""
+
+    type_hint_coverage_pass: int = 70  # Percentage for Level 4
+    type_hint_coverage_optimal: int = 85  # Percentage for Level 5
+    docstring_coverage_pass: int = 60  # Percentage for pass
+    docstring_coverage_partial: int = 30  # Percentage for partial
 
 
 class DetectionConfig(BaseModel):
@@ -205,6 +353,7 @@ class AuditConfig(BaseModel):
     categories: dict[str, CategoryConfig] = Field(default_factory=dict)
     checks: dict[str, CheckConfig] = Field(default_factory=dict)
     detection: DetectionConfig = Field(default_factory=DetectionConfig)
+    thresholds: ThresholdConfig = Field(default_factory=ThresholdConfig)  # v2
     default_format: str = "table"
     include_recommendations: bool = True
     show_evidence: bool = True
@@ -243,7 +392,7 @@ class AuditConfig(BaseModel):
 
 
 def get_level_for_score(score: float) -> ReadinessLevel:
-    """Determine readiness level based on score."""
+    """Determine readiness level based on score (v1 compatibility)."""
     if score <= 5:
         return ReadinessLevel.HUMAN_ONLY
     elif score <= 9:
@@ -252,3 +401,58 @@ def get_level_for_score(score: float) -> ReadinessLevel:
         return ReadinessLevel.SEMI_AUTONOMOUS
     else:
         return ReadinessLevel.AGENT_READY
+
+
+def get_maturity_for_score(score: float) -> int:
+    """Determine maturity level based on score (v2).
+
+    Note: This is the score-based level; actual level may be lower
+    if gate checks fail.
+    """
+    if score <= 4:
+        return 1  # Functional
+    elif score <= 7:
+        return 2  # Documented
+    elif score <= 11:
+        return 3  # Standardized
+    elif score <= 14:
+        return 4  # Optimized
+    else:
+        return 5  # Autonomous
+
+
+def calculate_maturity_with_gates(
+    score_based_level: int, gates: dict[str, GateStatus]
+) -> int:
+    """Calculate final maturity level considering gate failures.
+
+    The maturity level is the minimum of:
+    - The score-based level
+    - The highest level where all gates pass
+
+    Args:
+        score_based_level: Maturity level based on numeric score.
+        gates: Gate status for each level.
+
+    Returns:
+        Final maturity level (1-5).
+    """
+    max_gate_level = score_based_level
+
+    # Check gates from highest to lowest
+    for level in range(score_based_level, 2, -1):  # 5, 4, 3 (skip 1, 2 - no gates)
+        gate_key = f"level_{level}"
+        if gate_key in gates and not gates[gate_key].passed:
+            max_gate_level = level - 1
+
+    return max(1, max_gate_level)
+
+
+def get_maturity_name(level: int) -> str:
+    """Get human-readable name for maturity level."""
+    return MATURITY_NAMES.get(level, "Unknown")
+
+
+def get_maturity_description(level: int) -> str:
+    """Get description for maturity level."""
+    return MATURITY_DESCRIPTIONS.get(level, "")

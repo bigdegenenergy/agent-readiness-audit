@@ -200,3 +200,30 @@ class TestSecurityGovernanceChecks:
     def test_security_policy_fail(self, minimal_repo: Path) -> None:
         result = check_security_policy_present_or_baseline(minimal_repo)
         assert not result.passed
+
+
+class TestGateCheckIntegrity:
+    """Tests for gate check ID integrity.
+
+    Ensures all check IDs referenced in GATE_CHECKS exist in the check registry.
+    """
+
+    def test_gate_check_ids_exist_in_registry(self) -> None:
+        """Verify all gate check IDs reference valid registered checks."""
+        from agent_readiness_audit.checks.base import get_all_checks
+        from agent_readiness_audit.models import GATE_CHECKS
+
+        # Get all registered check names (get_all_checks returns dict[name, definition])
+        registered_checks = set(get_all_checks().keys())
+
+        # Verify all gate checks exist
+        missing_checks = []
+        for level, check_ids in GATE_CHECKS.items():
+            for check_id in check_ids:
+                if check_id not in registered_checks:
+                    missing_checks.append((level, check_id))
+
+        assert not missing_checks, (
+            f"Gate checks reference non-existent check IDs: {missing_checks}. "
+            f"Registered checks: {sorted(registered_checks)}"
+        )

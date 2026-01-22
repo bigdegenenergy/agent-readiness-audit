@@ -8,19 +8,44 @@
 
 **A CLI tool that audits repositories for agent-readiness and outputs human + machine-readable reports.**
 
-Agent Readiness Audit (`ara`) helps you understand how well your repositories are prepared for AI agents to work with them autonomously. It analyzes your codebase across 8 key dimensions and provides actionable recommendations to improve agent compatibility.
+Agent Readiness Audit (`ara`) certifies how well repositories support autonomous AI agents. It treats your codebase as a **deterministic API surface** for probabilistic entities (AI agents), measuring readiness across 15 pillars and 5 maturity levels.
 
 ## What is Agent Readiness?
 
-Agent readiness measures how well a repository supports autonomous AI agents in performing development tasks. A highly agent-ready repository has clear documentation, reproducible builds, comprehensive tests, and strong guardrails that help agents understand, modify, and validate code changes safely.
+Agent readiness measures how well a repository supports autonomous AI agents in performing development tasks. Agent-native environments require:
 
-The concept recognizes that AI agents work differently from human developers. They benefit from explicit instructions, deterministic environments, fast feedback loops, and clear boundaries. A repository optimized for agent readiness enables AI to contribute more effectively while reducing the risk of errors.
+- **Determinism**: Reproducible builds, pinned dependencies, consistent environments
+- **Fast Feedback**: Sub-second linting, pre-commit hooks, split test targets
+- **Type Contracts**: Type hints and strict checking as machine-readable documentation
+- **Verification Trust**: Machine-readable coverage, flake mitigation, test isolation
+- **Structured Documentation**: Diataxis-style docs, inline docstrings
+- **Agentic Security**: Prompt red-teaming, secret hygiene, sandboxed execution
+- **Telemetry**: OpenTelemetry tracing, structured JSON logging
+- **Evaluation Frameworks**: Golden datasets, regression testing for agent behavior
 
-## Why This Exists
+## Maturity Model
 
-As AI agents become more capable of writing and modifying code, the quality of your repository's "developer experience" directly impacts how effectively agents can work with it. This tool helps you identify gaps and prioritize improvements that will make your codebase more accessible to both human and AI contributors.
+ARA v2 uses a 5-level maturity model:
 
-Key benefits include faster agent onboarding, more reliable automated changes, reduced need for human intervention, and better overall code quality through improved documentation and testing practices.
+| Level | Name         | Description                                                 | Score |
+| ----- | ------------ | ----------------------------------------------------------- | ----- |
+| 1     | Functional   | Works for humans; agents fail due to ambiguity              | 0-4   |
+| 2     | Documented   | Setup/run instructions exist; agents can attempt tasks      | 5-7   |
+| 3     | Standardized | CI, linting, tests, deterministic deps; minimum for agents  | 8-11  |
+| 4     | Optimized    | Fast feedback, test splitting, strong guardrails            | 12-14 |
+| 5     | Autonomous   | Telemetry, evals, golden datasets, agentic security posture | 15-16 |
+
+Each level has **gate checks** that must pass. A repository cannot achieve Level N without passing all gates for that level. See [AGENTS.md](AGENTS.md) for the complete specification.
+
+## No-Gaming Principles
+
+ARA is designed to prevent score inflation:
+
+1. **No ceremonial artifacts**: Checks verify meaningful content, not just file presence
+2. **Evidence required**: Every pass/fail records evidence in output
+3. **Gate enforcement**: High scores require actual capabilities, not workarounds
+4. **Safe by default**: No arbitrary code execution; network calls require explicit opt-in
+5. **Stable semantics**: Scoring changes require version bumps and migration notes
 
 ## Installation
 
@@ -52,29 +77,70 @@ Scan a single repository:
 ara scan --repo .
 ```
 
+Scan with JSON output:
+
+```bash
+ara scan --repo . --format json
+```
+
 Scan multiple repositories:
 
 ```bash
-ara scan --root ~/code --depth 2 --out ./out
+ara scan --root ~/code --depth 2 --out ./reports
 ```
 
-Generate a configuration file:
+Strict mode (exit non-zero if below threshold):
 
 ```bash
-ara init-config --out ./.agent_readiness_audit.toml
+ara scan --repo . --strict --min-score 10
 ```
+
+## Scoring Model
+
+Repositories are scored on a 0-16 point scale across 8 categories (v1 compatibility), while also reporting the 5-level maturity model.
+
+### Categories (v1 Compatible)
+
+| Category              | Description                            | Max Points |
+| --------------------- | -------------------------------------- | ---------- |
+| Discoverability       | README presence and onboarding clarity | 2          |
+| Deterministic Setup   | Reproducible dependency management     | 2          |
+| Build and Run         | Standard commands for build/test/lint  | 2          |
+| Test Feedback Loop    | Test infrastructure and runnability    | 2          |
+| Static Guardrails     | Linting, formatting, type checking     | 2          |
+| Observability         | Logging and error handling             | 2          |
+| CI Enforcement        | Continuous integration configuration   | 2          |
+| Security & Governance | Security policies and hygiene          | 2          |
+
+### Pillars (v2)
+
+v2 introduces 15 pillars for more granular analysis:
+
+- **environment_determinism**: Reproducible dependencies and pinned versions
+- **fast_guardrails**: Sub-second local feedback (ruff, pre-commit)
+- **type_contracts**: Type hints and strictness config
+- **verification_trust**: Test reliability (flake mitigation, coverage artifacts)
+- **verification_speed**: Fast feedback via test splitting
+- **documentation_structure**: Structured docs (Diataxis)
+- **inline_documentation**: Docstring coverage
+- **contribution_contract**: CONTRIBUTING, code of conduct
+- **agentic_security**: Prompt red-teaming (promptfoo)
+- **secret_hygiene**: No hardcoded secrets, env documentation
+- **telemetry_tracing**: OpenTelemetry instrumentation
+- **structured_logging_cost**: JSON logging for cost/perf tracking
+- **eval_frameworks**: DeepEval/Ragas integration
+- **golden_datasets**: Regression test datasets
+- **distribution_dx**: Package distribution readiness
 
 ## Configuration
 
-Agent Readiness Audit can be customized via a TOML configuration file. By default, it looks for `.agent_readiness_audit.toml` in the current directory or parent directories.
+ARA can be customized via a TOML configuration file. By default, it looks for `.agent_readiness_audit.toml` in the current directory or parent directories.
 
 Generate a starter configuration:
 
 ```bash
 ara init-config
 ```
-
-The configuration allows you to customize scoring weights, enable/disable specific checks, adjust detection patterns, and set minimum passing scores for strict mode.
 
 Example configuration:
 
@@ -89,68 +155,18 @@ max_points = 2
 
 [checks]
 readme_exists = { enabled = true, weight = 1.0 }
+python_type_hint_coverage = { enabled = true, weight = 1.0 }
+
+[thresholds]
+type_hint_coverage_pass = 70    # Percentage for Level 4
+type_hint_coverage_optimal = 85 # Percentage for Level 5
 ```
-
-## Scoring Model
-
-Repositories are scored on a 0-16 point scale across 8 categories, each worth up to 2 points.
-
-| Category              | Description                            | Max Points |
-| --------------------- | -------------------------------------- | ---------- |
-| Discoverability       | README presence and onboarding clarity | 2          |
-| Deterministic Setup   | Reproducible dependency management     | 2          |
-| Build and Run         | Standard commands for build/test/lint  | 2          |
-| Test Feedback Loop    | Test infrastructure and runnability    | 2          |
-| Static Guardrails     | Linting, formatting, type checking     | 2          |
-| Observability         | Logging and error handling             | 2          |
-| CI Enforcement        | Continuous integration configuration   | 2          |
-| Security & Governance | Security policies and hygiene          | 2          |
-
-Scores map to readiness levels:
-
-| Score Range | Level               | Description                            |
-| ----------- | ------------------- | -------------------------------------- |
-| 0-5         | Human-Only Repo     | Requires significant human guidance    |
-| 6-9         | Assisted Agent      | Agents can help with supervision       |
-| 10-13       | Semi-Autonomous     | Agents can work with minimal oversight |
-| 14-16       | Agent-Ready Factory | Fully optimized for autonomous agents  |
-
-## Adding Checks (Plugin Model)
-
-New checks can be added by creating a function decorated with `@check`:
-
-```python
-from pathlib import Path
-from agent_readiness_audit.checks.base import CheckResult, check
-
-@check(
-    name="my_custom_check",
-    category="discoverability",
-    description="Check for custom requirement"
-)
-def check_my_custom_thing(repo_path: Path) -> CheckResult:
-    # Your check logic here
-    if (repo_path / "CUSTOM_FILE.md").exists():
-        return CheckResult(
-            passed=True,
-            evidence="Found CUSTOM_FILE.md"
-        )
-    return CheckResult(
-        passed=False,
-        evidence="CUSTOM_FILE.md not found",
-        suggestion="Add a CUSTOM_FILE.md to document custom requirements."
-    )
-```
-
-Register your check in the appropriate category's `__init__.py` and it will be automatically included in scans.
 
 ## Output Formats
 
-Agent Readiness Audit supports multiple output formats.
-
 ### Table (default)
 
-Human-readable terminal output with colors and formatting:
+Human-readable terminal output with colors:
 
 ```bash
 ara scan --repo . --format table
@@ -158,15 +174,32 @@ ara scan --repo . --format table
 
 ### JSON
 
-Machine-readable JSON for integration with other tools:
+Machine-readable JSON including maturity level, pillars, and gates:
 
 ```bash
 ara scan --repo . --format json
 ```
 
+```json
+{
+    "maturity_level": 4,
+    "maturity_name": "Optimized",
+    "score_total": 13.5,
+    "max_score": 16,
+    "gates": {
+        "level_3": { "passed": true },
+        "level_4": { "passed": true },
+        "level_5": {
+            "passed": false,
+            "failed_checks": ["opentelemetry_present"]
+        }
+    }
+}
+```
+
 ### Markdown
 
-Documentation-ready Markdown reports:
+Documentation-ready reports:
 
 ```bash
 ara scan --repo . --format markdown
@@ -220,16 +253,41 @@ Options:
   --out, -o PATH        Output path (default: ./.agent_readiness_audit.toml)
 ```
 
-## Roadmap
+## Adding Custom Checks
 
-The following features are planned for future releases:
+New checks can be added by creating a function decorated with `@check`:
 
-- Additional language-specific checks (Go, Rust, Java)
-- Integration with popular CI/CD platforms
-- Web dashboard for visualizing results over time
-- GitHub Action for automated PR checks
-- VS Code extension for real-time feedback
-- Custom check plugin system with external packages
+```python
+from pathlib import Path
+from agent_readiness_audit.checks.base import CheckResult, check
+
+@check(
+    name="my_custom_check",
+    category="discoverability",
+    description="Check for custom requirement",
+    pillar="documentation_structure",
+    gate_level=3,  # Optional: makes this a gate for Level 3
+)
+def check_my_custom_thing(repo_path: Path) -> CheckResult:
+    if (repo_path / "CUSTOM_FILE.md").exists():
+        return CheckResult(
+            passed=True,
+            evidence="Found CUSTOM_FILE.md"
+        )
+    return CheckResult(
+        passed=False,
+        evidence="CUSTOM_FILE.md not found",
+        suggestion="Add a CUSTOM_FILE.md to document custom requirements."
+    )
+```
+
+See [AGENTS.md](AGENTS.md) for the complete check specification contract.
+
+## Documentation
+
+- [AGENTS.md](AGENTS.md) - **Authoritative v2 specification**: maturity model, pillars, check contracts
+- [CLAUDE.md](CLAUDE.md) - AI development instructions
+- [CONTRIBUTING.md](CONTRIBUTING.md) - Contribution guidelines
 
 ## Contributing
 
@@ -251,9 +309,8 @@ uv run pre-commit install
 # Run tests
 uv run pytest
 
-# Run linting
-uv run ruff check .
-uv run mypy agent_readiness_audit
+# Run all quality checks
+make check
 ```
 
 ## License
