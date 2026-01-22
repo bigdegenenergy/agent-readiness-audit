@@ -111,7 +111,7 @@ def check_prompt_secret_scanning(repo_path: Path) -> CheckResult:
         r'secret[_-]?key\s*[=:]\s*["\']?[a-zA-Z0-9_-]{20,}',
         r'password\s*[=:]\s*["\']?[^\s"\']{8,}',
         r'token\s*[=:]\s*["\']?[a-zA-Z0-9_-]{20,}',
-        r"sk-[a-zA-Z0-9]{32,}",  # OpenAI key pattern
+        r"sk-[a-zA-Z0-9_-]{20,}",  # OpenAI key pattern (includes sk-proj-*, sk-svc-*)
         r"xox[baprs]-[a-zA-Z0-9-]+",  # Slack token pattern
         r"ghp_[a-zA-Z0-9]{36}",  # GitHub PAT pattern
         r"gho_[a-zA-Z0-9]{36}",  # GitHub OAuth token pattern

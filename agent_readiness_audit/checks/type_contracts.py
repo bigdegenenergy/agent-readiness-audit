@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import re
 from pathlib import Path
 
 from agent_readiness_audit.checks.base import (
@@ -189,15 +190,13 @@ def check_mypy_strictness(repo_path: Path) -> CheckResult:
     if pyproject:
         content = read_file_safe(pyproject)
         if content and "[tool.mypy]" in content:
-            if "strict = true" in content or "strict=true" in content:
+            # Use regex to handle variable whitespace (strict = true, strict=true, etc.)
+            if re.search(r"strict\s*=\s*true", content, re.IGNORECASE):
                 return CheckResult(
                     passed=True,
                     evidence=f"mypy strict mode enabled in {pyproject.name}",
                 )
-            if (
-                "disallow_untyped_defs = true" in content
-                or "disallow_untyped_defs=true" in content
-            ):
+            if re.search(r"disallow_untyped_defs\s*=\s*true", content, re.IGNORECASE):
                 return CheckResult(
                     passed=True,
                     evidence=f"mypy disallow_untyped_defs enabled in {pyproject.name}",
@@ -215,15 +214,13 @@ def check_mypy_strictness(repo_path: Path) -> CheckResult:
     if mypy_ini:
         content = read_file_safe(mypy_ini)
         if content:
-            if "strict = True" in content or "strict=True" in content:
+            # Use regex to handle variable whitespace
+            if re.search(r"strict\s*=\s*True", content, re.IGNORECASE):
                 return CheckResult(
                     passed=True,
                     evidence="mypy strict mode enabled in mypy.ini",
                 )
-            if (
-                "disallow_untyped_defs = True" in content
-                or "disallow_untyped_defs=True" in content
-            ):
+            if re.search(r"disallow_untyped_defs\s*=\s*True", content, re.IGNORECASE):
                 return CheckResult(
                     passed=True,
                     evidence="mypy disallow_untyped_defs enabled in mypy.ini",
@@ -240,7 +237,8 @@ def check_mypy_strictness(repo_path: Path) -> CheckResult:
     if setup_cfg:
         content = read_file_safe(setup_cfg)
         if content and "[mypy]" in content:
-            if "strict = True" in content:
+            # Use regex to handle variable whitespace
+            if re.search(r"strict\s*=\s*True", content, re.IGNORECASE):
                 return CheckResult(
                     passed=True,
                     evidence="mypy strict mode enabled in setup.cfg",
