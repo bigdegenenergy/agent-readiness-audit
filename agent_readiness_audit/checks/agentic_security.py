@@ -78,14 +78,19 @@ def check_promptfoo_present(repo_path: Path) -> CheckResult:
 @check(
     name="prompt_secret_scanning",
     category="security_and_governance",
-    description="Check for secrets in prompt templates",
+    description="Check for secrets in prompt template directories (prompts/, templates/)",
     pillar="secret_hygiene",
 )
 def check_prompt_secret_scanning(repo_path: Path) -> CheckResult:
-    """Check for hardcoded secrets in prompt templates.
+    """Check for hardcoded secrets in prompt template directories.
 
-    Scans prompt/, templates/, prompts/ directories for patterns that
-    look like secrets (API keys, tokens, etc.).
+    Scans directories named prompt/, prompts/, templates/, or prompt_templates/
+    anywhere in the repository for patterns that look like secrets (API keys,
+    tokens, etc.).
+
+    Scope: This check only scans dedicated prompt directories, not all source
+    files. For comprehensive secret scanning across all files, use dedicated
+    tools like gitleaks or trufflehog.
 
     IMPORTANT: Never prints full secrets - only redacted hashes.
     """

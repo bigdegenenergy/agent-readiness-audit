@@ -4,8 +4,13 @@ from __future__ import annotations
 
 import ast
 import configparser
-import tomllib
 from pathlib import Path
+
+# Python 3.11+ has tomllib in stdlib; fallback to tomli for older versions
+try:
+    import tomllib
+except ImportError:
+    import tomli as tomllib  # type: ignore[import-not-found,no-redef]
 
 from agent_readiness_audit.checks.base import (
     CheckResult,

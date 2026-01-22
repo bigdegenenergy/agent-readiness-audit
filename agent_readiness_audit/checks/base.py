@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+import sys
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -9,6 +11,14 @@ from typing import TypeAlias
 
 from agent_readiness_audit.models import PILLAR_TO_CATEGORY, CheckStatus
 from agent_readiness_audit.models import CheckResult as ModelCheckResult
+
+# Configure logger for audit warnings
+_logger = logging.getLogger("agent_readiness_audit")
+if not _logger.handlers:
+    handler = logging.StreamHandler(sys.stderr)
+    handler.setFormatter(logging.Formatter("%(levelname)s: %(message)s"))
+    _logger.addHandler(handler)
+    _logger.setLevel(logging.WARNING)
 
 # Registry of all checks
 _CHECK_REGISTRY: dict[str, CheckDefinition] = {}
@@ -280,13 +290,24 @@ def read_file_safe(file_path: Path, max_size: int = 1_000_000) -> str | None:
         max_size: Maximum file size in bytes to read.
 
     Returns:
-        File contents or None if file doesn't exist or is too large.
+        File contents or None if file doesn't exist, is too large, or unreadable.
+
+    Note:
+        Permission errors and other read failures are logged as warnings to stderr.
     """
     try:
         if not file_path.exists():
             return None
         if file_path.stat().st_size > max_size:
+            _logger.debug("Skipping large file (>%d bytes): %s", max_size, file_path)
             return None
         return file_path.read_text(encoding="utf-8", errors="ignore")
-    except Exception:
+    except PermissionError:
+        _logger.warning("Permission denied reading file: %s", file_path)
+        return None
+    except OSError as e:
+        _logger.warning("Cannot read file %s: %s", file_path, e)
+        return None
+    except Exception as e:
+        _logger.warning("Unexpected error reading file %s: %s", file_path, e)
         return None
