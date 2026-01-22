@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from typer.testing import CliRunner
@@ -9,6 +10,16 @@ from typer.testing import CliRunner
 from agent_readiness_audit.cli import app
 
 runner = CliRunner()
+
+
+def strip_ansi(text: str) -> str:
+    """Strip ANSI escape codes from text.
+
+    Python 3.12+ with Rich/Typer may output ANSI codes even in test runners,
+    which breaks string matching like `"--repo" in result.stdout`.
+    """
+    ansi_pattern = re.compile(r"\x1b\[[0-9;]*[a-zA-Z]")
+    return ansi_pattern.sub("", text)
 
 
 class TestCLIBasics:
@@ -31,9 +42,10 @@ class TestScanCommand:
     def test_scan_help(self) -> None:
         result = runner.invoke(app, ["scan", "--help"])
         assert result.exit_code == 0
-        assert "--repo" in result.stdout
-        assert "--root" in result.stdout
-        assert "--format" in result.stdout
+        output = strip_ansi(result.stdout)
+        assert "--repo" in output
+        assert "--root" in output
+        assert "--format" in output
 
     def test_scan_single_repo(self, python_repo: Path) -> None:
         result = runner.invoke(app, ["scan", "--repo", str(python_repo)])
@@ -88,8 +100,9 @@ class TestReportCommand:
     def test_report_help(self) -> None:
         result = runner.invoke(app, ["report", "--help"])
         assert result.exit_code == 0
-        assert "--input" in result.stdout
-        assert "--format" in result.stdout
+        output = strip_ansi(result.stdout)
+        assert "--input" in output
+        assert "--format" in output
 
     def test_report_from_json(self, python_repo: Path, temp_dir: Path) -> None:
         # First generate JSON
@@ -118,7 +131,8 @@ class TestInitConfigCommand:
     def test_init_config_help(self) -> None:
         result = runner.invoke(app, ["init-config", "--help"])
         assert result.exit_code == 0
-        assert "--out" in result.stdout
+        output = strip_ansi(result.stdout)
+        assert "--out" in output
 
     def test_init_config_creates_file(self, temp_dir: Path) -> None:
         config_path = temp_dir / ".agent_readiness_audit.toml"
