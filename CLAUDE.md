@@ -25,7 +25,7 @@ This is the **AI Dev Toolkit** - a template that configures AI coding assistants
 
 **Capabilities:**
 
-- **18 Specialized Agents** for different development domains
+- **17 Specialized Agents** for different development domains
 - **11 Auto-Discovered Skills** for domain expertise
 - **22 Slash Commands** for workflows and orchestration
 - **8 Automated Hooks** for quality gates and friction elimination
@@ -270,15 +270,17 @@ Use "be critical" and "be honest" in prompts:
 
 The `.github/workflows/` directory contains automated CI/CD workflows:
 
-| Workflow                | Purpose                                            |
-| ----------------------- | -------------------------------------------------- |
-| `ci.yml`                | Linting, config validation, docs checks            |
-| `security.yml`          | Secret scanning, security analysis, PII detection  |
-| `pii-scan-content.yml`  | Scans issues/PRs for personal information          |
-| `gemini-pr-review.yml`  | AI-powered code review with structured TOML output |
-| `agent-reminder.yml`    | Reminds agents to read source repo                 |
-| `label-agent-prs.yml`   | Auto-labels AI-generated PRs                       |
-| `notify-on-failure.yml` | Sends failure notifications                        |
+| Workflow                    | Purpose                                            |
+| --------------------------- | -------------------------------------------------- |
+| `ci.yml`                    | Linting, config validation, docs checks            |
+| `security.yml`              | Secret scanning, security analysis, PII detection  |
+| `pii-scan-content.yml`      | Scans issues/PRs for personal information          |
+| `gemini-pr-review-plus.yml` | AI-powered code review with structured TOML output |
+| `agent-reminder.yml`        | Reminds agents to read source repo                 |
+| `notify-on-failure.yml`     | Sends failure notifications                        |
+| `oss-checks.yml`            | Open source hygiene checks                         |
+| `release.yml`               | Automated release workflow                         |
+| `sync-claude-config.yml`    | Syncs Claude configuration                         |
 
 ### Setting Up GitHub Actions
 
@@ -388,14 +390,14 @@ The PR review workflow uses a git-native approach for agent-to-agent communicati
 ### How It Works
 
 1. **Review Agent (Gemini)** reviews the PR and:
-   - Posts feedback as a PR comment
-   - If issues found, pushes `REVIEW_INSTRUCTIONS.md` to the branch
+    - Posts feedback as a PR comment
+    - If issues found, pushes `REVIEW_INSTRUCTIONS.md` to the branch
 
 2. **Coding Agent (Claude)** addresses feedback by:
-   - Reading `REVIEW_INSTRUCTIONS.md` (if present)
-   - Fixing the issues
-   - Deleting the instructions file
-   - Committing with `Agent-Note:` trailer explaining fixes
+    - Reading `REVIEW_INSTRUCTIONS.md` (if present)
+    - Fixing the issues
+    - Deleting the instructions file
+    - Committing with `Agent-Note:` trailer explaining fixes
 
 3. **Re-Review**: Gemini reads `Agent-Note:` trailers from commits and verifies fixes
 
@@ -639,30 +641,36 @@ Track improvements to this configuration:
 - **2025-01-04**: Fixed recursive triggers in GitHub Actions workflows (pii-scan, label-agent, reminder)
 - **2025-01-04**: Added github-actions[bot] exclusion to CI and Security workflows to prevent infinite loops
 - **2026-01-06**: **Major Enhancement** - Integrated agents and orchestration from wshobson/agents:
-  - Added 10 new specialized agents (python-pro, typescript-pro, backend-architect, database-architect, kubernetes-architect, test-automator, devops-troubleshooter, ai-engineer)
-  - Added Skills architecture with 10 auto-discovered skills (tdd, security-review, api-design, async-patterns, debugging, refactoring, testing-patterns, k8s-operations, cicd-automation, observability)
-  - Added 4 orchestration commands (/feature-workflow, /security-hardening, /incident-response, /codebase-audit)
-  - Total: 18 agents, 10 skills, 21 commands
+    - Added 10 new specialized agents (python-pro, typescript-pro, backend-architect, database-architect, kubernetes-architect, test-automator, devops-troubleshooter, ai-engineer)
+    - Added Skills architecture with 10 auto-discovered skills (tdd, security-review, api-design, async-patterns, debugging, refactoring, testing-patterns, k8s-operations, cicd-automation, observability)
+    - Added 4 orchestration commands (/feature-workflow, /security-hardening, /incident-response, /codebase-audit)
+    - Total: 17 agents, 10 skills, 21 commands
 - **2026-01-07**: Added commit context generator hook and enhanced Gemini PR review:
-  - New `commit-context-generator.py` hook documents changes before commits
-  - Gemini PR review now reads commit messages, PR body, and auto-generated context
-  - TOML review output now displayed in visible, copyable markdown block
-  - Total: 18 agents, 10 skills, 21 commands, 5 hooks
+    - New `commit-context-generator.py` hook documents changes before commits
+    - Gemini PR review now reads commit messages, PR body, and auto-generated context
+    - TOML review output now displayed in visible, copyable markdown block
+    - Total: 17 agents, 10 skills, 21 commands, 5 hooks
 - **2026-01-17**: **Friction Elimination** - Added 3 new hooks to eliminate developer friction:
-  - New `session-start.sh` (SessionStart) injects git status, TODOs, and project context automatically
-  - New `auto-approve.sh` (PermissionRequest) auto-approves safe commands (tests, lint, build, git read ops)
-  - New `skill-activation-prompt.mjs` (UserPromptSubmit) auto-activates relevant skills based on prompt keywords
-  - Total: 18 agents, 10 skills, 21 commands, 8 hooks
+    - New `session-start.sh` (SessionStart) injects git status, TODOs, and project context automatically
+    - New `auto-approve.sh` (PermissionRequest) auto-approves safe commands (tests, lint, build, git read ops)
+    - New `skill-activation-prompt.mjs` (UserPromptSubmit) auto-activates relevant skills based on prompt keywords
+    - Total: 17 agents, 10 skills, 21 commands, 8 hooks
 - **2026-01-17**: **Ralph Integration** - Added autonomous development loop from [frankbria/ralph-claude-code](https://github.com/frankbria/ralph-claude-code):
-  - New `/ralph` command for autonomous iterative development with circuit breaker safeguards
-  - New `autonomous-loop` skill with dual-condition exit gate and structured status reporting
-  - Added project templates (`PROMPT.md`, `fix_plan.md`, `AGENT.md`) in `.claude/templates/ralph/`
-  - Total: 18 agents, 11 skills, 22 commands, 8 hooks
+    - New `/ralph` command for autonomous iterative development with circuit breaker safeguards
+    - New `autonomous-loop` skill with dual-condition exit gate and structured status reporting
+    - Added project templates (`PROMPT.md`, `fix_plan.md`, `AGENT.md`) in `.claude/templates/ralph/`
+    - Total: 17 agents, 11 skills, 22 commands, 8 hooks
 - **2026-01-21**: **Git-Native Agent Communication** - Replaced cover letter with git-native workflow:
-  - Review agent (Gemini) pushes `REVIEW_INSTRUCTIONS.md` when issues found
-  - Coding agent (Claude) responds via `Agent-Note:` git trailers in commits
-  - Instructions file deleted by coding agent (never merged)
-  - No cleanup workflows needed - ephemeral by design
+    - Review agent (Gemini) pushes `REVIEW_INSTRUCTIONS.md` when issues found
+    - Coding agent (Claude) responds via `Agent-Note:` git trailers in commits
+    - Instructions file deleted by coding agent (never merged)
+    - No cleanup workflows needed - ephemeral by design
+- **2026-01-22**: **Documentation Audit** - Updated CLAUDE.md to match actual repository state:
+    - Corrected agent count from 18 to 17 (actual count in `.claude/agents/`)
+    - Fixed workflow filename from `gemini-pr-review.yml` to `gemini-pr-review-plus.yml`
+    - Removed non-existent `label-agent-prs.yml` workflow
+    - Added missing workflows: `oss-checks.yml`, `release.yml`, `sync-claude-config.yml`
+    - Total: 17 agents, 11 skills, 22 commands, 8 hooks, 9 workflows
 
 ---
 
