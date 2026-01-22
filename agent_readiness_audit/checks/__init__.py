@@ -1,5 +1,13 @@
 """Check implementations for Agent Readiness Audit."""
 
+from agent_readiness_audit.checks.agentic_security import (
+    check_eval_framework_detect,
+    check_golden_dataset_present,
+    check_opentelemetry_present,
+    check_prompt_secret_scanning,
+    check_promptfoo_present,
+    check_structured_logging_present,
+)
 from agent_readiness_audit.checks.base import CheckResult, check, get_all_checks
 from agent_readiness_audit.checks.build_and_run import (
     check_documented_commands_present,
@@ -20,6 +28,18 @@ from agent_readiness_audit.checks.discoverability import (
     check_readme_has_setup_section,
     check_readme_has_test_instructions,
 )
+from agent_readiness_audit.checks.documentation import (
+    check_contributing_exists,
+    check_diataxis_structure,
+    check_docstring_coverage_python,
+)
+from agent_readiness_audit.checks.fast_guardrails import (
+    check_fast_linter_python,
+    check_flake_awareness_pytest,
+    check_machine_readable_coverage,
+    check_precommit_present,
+    check_test_splitting,
+)
 from agent_readiness_audit.checks.observability import (
     check_logging_present,
     check_structured_errors_present,
@@ -38,6 +58,12 @@ from agent_readiness_audit.checks.test_feedback_loop import (
     check_test_command_detectable,
     check_test_command_has_timeout,
     check_tests_directory_or_config_exists,
+)
+
+# v2 checks
+from agent_readiness_audit.checks.type_contracts import (
+    check_mypy_strictness,
+    check_python_type_hint_coverage,
 )
 
 __all__ = [
@@ -74,4 +100,24 @@ __all__ = [
     "check_gitignore_present",
     "check_env_example_or_secrets_docs_present",
     "check_security_policy_present_or_baseline",
+    # v2: Type Contracts
+    "check_python_type_hint_coverage",
+    "check_mypy_strictness",
+    # v2: Documentation
+    "check_diataxis_structure",
+    "check_docstring_coverage_python",
+    "check_contributing_exists",
+    # v2: Fast Guardrails
+    "check_fast_linter_python",
+    "check_precommit_present",
+    "check_test_splitting",
+    "check_machine_readable_coverage",
+    "check_flake_awareness_pytest",
+    # v2: Agentic Security & Telemetry
+    "check_promptfoo_present",
+    "check_prompt_secret_scanning",
+    "check_opentelemetry_present",
+    "check_structured_logging_present",
+    "check_eval_framework_detect",
+    "check_golden_dataset_present",
 ]

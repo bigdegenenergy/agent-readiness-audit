@@ -18,6 +18,7 @@ README_FILENAMES = ["README.md", "README.MD", "README", "readme.md", "Readme.md"
     name="readme_exists",
     category="discoverability",
     description="Check if a README file exists in the repository root",
+    pillar="documentation_structure",
 )
 def check_readme_exists(repo_path: Path) -> CheckResult:
     """Check if README exists."""
@@ -38,6 +39,8 @@ def check_readme_exists(repo_path: Path) -> CheckResult:
     name="readme_has_setup_section",
     category="discoverability",
     description="Check if README contains setup/installation instructions",
+    pillar="documentation_structure",
+    gate_level=3,
 )
 def check_readme_has_setup_section(repo_path: Path) -> CheckResult:
     """Check if README has setup instructions."""
@@ -88,6 +91,8 @@ def check_readme_has_setup_section(repo_path: Path) -> CheckResult:
     name="readme_has_test_instructions",
     category="discoverability",
     description="Check if README contains test running instructions",
+    pillar="documentation_structure",
+    gate_level=3,
 )
 def check_readme_has_test_instructions(repo_path: Path) -> CheckResult:
     """Check if README has test instructions."""

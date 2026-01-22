@@ -84,8 +84,9 @@ class TestScanRepo:
         result = scan_repo(python_repo, config)
 
         assert result.repo_name == "python-repo"
-        assert result.score_total >= 10  # Should be decent score
+        assert result.score_total >= 8  # Should be decent score (v2 has more checks)
         assert result.level in [
+            ReadinessLevel.ASSISTED,
             ReadinessLevel.SEMI_AUTONOMOUS,
             ReadinessLevel.AGENT_READY,
         ]
@@ -94,8 +95,10 @@ class TestScanRepo:
         config = AuditConfig.default()
         result = scan_repo(agent_ready_repo, config)
 
-        assert result.score_total >= 12  # Should be high score
-        assert len(result.fix_first) < 5  # Few recommendations
+        assert result.score_total >= 9  # Should be good score (v2 has more checks)
+        assert (
+            len(result.fix_first) <= 7
+        )  # Some recommendations expected with v2 checks
 
     def test_scan_generates_fix_first(self, minimal_repo: Path) -> None:
         config = AuditConfig.default()

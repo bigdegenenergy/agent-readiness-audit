@@ -71,6 +71,8 @@ JS_TYPE_CONFIGS = ["tsconfig.json", "jsconfig.json"]
     name="linter_config_present",
     category="static_guardrails",
     description="Check if linter configuration exists",
+    pillar="fast_guardrails",
+    gate_level=3,
 )
 def check_linter_config_present(repo_path: Path) -> CheckResult:
     """Check if linter is configured."""
@@ -113,6 +115,7 @@ def check_linter_config_present(repo_path: Path) -> CheckResult:
     name="formatter_config_present",
     category="static_guardrails",
     description="Check if code formatter configuration exists",
+    pillar="fast_guardrails",
 )
 def check_formatter_config_present(repo_path: Path) -> CheckResult:
     """Check if formatter is configured."""
@@ -166,6 +169,7 @@ def check_formatter_config_present(repo_path: Path) -> CheckResult:
     name="typecheck_config_present",
     category="static_guardrails",
     description="Check if type checking configuration exists",
+    pillar="type_contracts",
 )
 def check_typecheck_config_present(repo_path: Path) -> CheckResult:
     """Check if type checker is configured."""

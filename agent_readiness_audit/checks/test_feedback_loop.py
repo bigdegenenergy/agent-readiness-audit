@@ -39,6 +39,8 @@ TEST_CONFIG_FILES = [
     name="tests_directory_or_config_exists",
     category="test_feedback_loop",
     description="Check if tests directory or test configuration exists",
+    pillar="verification_trust",
+    gate_level=3,
 )
 def check_tests_directory_or_config_exists(repo_path: Path) -> CheckResult:
     """Check if tests exist."""
@@ -99,6 +101,7 @@ def check_tests_directory_or_config_exists(repo_path: Path) -> CheckResult:
     name="test_command_detectable",
     category="test_feedback_loop",
     description="Check if test command is easily detectable",
+    pillar="verification_trust",
 )
 def check_test_command_detectable(repo_path: Path) -> CheckResult:
     """Check if test command is detectable."""
@@ -168,6 +171,7 @@ def check_test_command_detectable(repo_path: Path) -> CheckResult:
     name="test_command_has_timeout",
     category="test_feedback_loop",
     description="Check if test configuration includes timeout settings",
+    pillar="verification_speed",
 )
 def check_test_command_has_timeout(repo_path: Path) -> CheckResult:
     """Check if tests have timeout configuration."""
