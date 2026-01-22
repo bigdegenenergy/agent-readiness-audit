@@ -106,15 +106,16 @@ def check_prompt_secret_scanning(repo_path: Path) -> CheckResult:
     prompt_dirs = ["prompt", "prompts", "templates", "prompt_templates"]
 
     # Patterns that indicate potential secrets
+    # Note: Using word boundaries (\b) to avoid false positives on kebab-case identifiers
     secret_patterns = [
         r'api[_-]?key\s*[=:]\s*["\']?[a-zA-Z0-9_-]{20,}',
         r'secret[_-]?key\s*[=:]\s*["\']?[a-zA-Z0-9_-]{20,}',
         r'password\s*[=:]\s*["\']?[^\s"\']{8,}',
         r'token\s*[=:]\s*["\']?[a-zA-Z0-9_-]{20,}',
-        r"sk-[a-zA-Z0-9_-]{20,}",  # OpenAI key pattern (includes sk-proj-*, sk-svc-*)
-        r"xox[baprs]-[a-zA-Z0-9-]+",  # Slack token pattern
-        r"ghp_[a-zA-Z0-9]{36}",  # GitHub PAT pattern
-        r"gho_[a-zA-Z0-9]{36}",  # GitHub OAuth token pattern
+        r"\bsk-[a-zA-Z0-9_-]{20,}\b",  # OpenAI key pattern (includes sk-proj-*, sk-svc-*)
+        r"\bxox[baprs]-[a-zA-Z0-9-]+\b",  # Slack token pattern
+        r"\bghp_[a-zA-Z0-9]{36}\b",  # GitHub PAT pattern
+        r"\bgho_[a-zA-Z0-9]{36}\b",  # GitHub OAuth token pattern
     ]
 
     suspicious_findings: list[tuple[str, str]] = []
