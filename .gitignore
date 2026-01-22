@@ -190,6 +190,7 @@ $RECYCLE.BIN/
 !CLAUDE.md
 !REVIEW_INSTRUCTIONS.md
 !docs/**/*.md
+!.claude/**/*.md
 out/
 output/
 reports/
