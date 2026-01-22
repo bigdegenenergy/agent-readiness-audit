@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -176,11 +175,14 @@ class DetectionConfig(BaseModel):
         ]
     )
     python_lint_configs: list[str] = Field(
-        default_factory=lambda: ["ruff.toml", ".ruff.toml", "setup.cfg", "pyproject.toml"]
+        default_factory=lambda: [
+            "ruff.toml",
+            ".ruff.toml",
+            "setup.cfg",
+            "pyproject.toml",
+        ]
     )
-    python_format_configs: list[str] = Field(
-        default_factory=lambda: ["pyproject.toml"]
-    )
+    python_format_configs: list[str] = Field(default_factory=lambda: ["pyproject.toml"])
     python_type_configs: list[str] = Field(
         default_factory=lambda: ["mypy.ini", "pyproject.toml", "pyrightconfig.json"]
     )

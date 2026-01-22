@@ -7,7 +7,6 @@ from pathlib import Path
 from agent_readiness_audit.checks.base import (
     CheckResult,
     check,
-    dir_exists,
     file_contains,
     file_exists,
     glob_files,
@@ -41,7 +40,9 @@ def check_ci_workflow_present(repo_path: Path) -> CheckResult:
     # Check for GitHub Actions
     gh_workflows = repo_path / ".github" / "workflows"
     if gh_workflows.is_dir():
-        workflow_files = glob_files(gh_workflows, "*.yml") + glob_files(gh_workflows, "*.yaml")
+        workflow_files = glob_files(gh_workflows, "*.yml") + glob_files(
+            gh_workflows, "*.yaml"
+        )
         if workflow_files:
             return CheckResult(
                 passed=True,
@@ -89,7 +90,9 @@ def check_ci_runs_tests_or_lint(repo_path: Path) -> CheckResult:
     # Check GitHub Actions workflows
     gh_workflows = repo_path / ".github" / "workflows"
     if gh_workflows.is_dir():
-        workflow_files = glob_files(gh_workflows, "*.yml") + glob_files(gh_workflows, "*.yaml")
+        workflow_files = glob_files(gh_workflows, "*.yml") + glob_files(
+            gh_workflows, "*.yaml"
+        )
         for workflow in workflow_files:
             # Check for test/lint commands
             test_patterns = [

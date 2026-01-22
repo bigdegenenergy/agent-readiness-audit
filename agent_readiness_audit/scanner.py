@@ -4,11 +4,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from agent_readiness_audit.checks.base import get_all_checks, get_checks_by_category, run_check
+from agent_readiness_audit.checks.base import (
+    get_all_checks,
+    run_check,
+)
 from agent_readiness_audit.models import (
     AuditConfig,
     CategoryScore,
-    CheckResult,
     RepoResult,
     ScanSummary,
     get_level_for_score,
@@ -168,7 +170,7 @@ def scan_repo(repo_path: Path, config: AuditConfig) -> RepoResult:
                 result.failed_checks.append(check_result)
 
     # Calculate category scores
-    for category, cat_score in result.category_scores.items():
+    for _category, cat_score in result.category_scores.items():
         if cat_score.total_checks > 0:
             # Score is proportional to passed checks
             pass_ratio = cat_score.passed_checks / cat_score.total_checks
@@ -198,16 +200,19 @@ def generate_fix_first(result: RepoResult) -> list[str]:
     """
     recommendations: list[str] = []
 
-    for category, fix_name in FIX_FIRST_PRIORITIES:
+    for category, _fix_name in FIX_FIRST_PRIORITIES:
         if category in result.category_scores:
             cat_score = result.category_scores[category]
             # If category has failures, add recommendation
             if cat_score.passed_checks < cat_score.total_checks:
                 # Get specific suggestions from failed checks
                 for check in cat_score.checks:
-                    if not check.passed and check.suggestion:
-                        if check.suggestion not in recommendations:
-                            recommendations.append(check.suggestion)
+                    if (
+                        not check.passed
+                        and check.suggestion
+                        and check.suggestion not in recommendations
+                    ):
+                        recommendations.append(check.suggestion)
 
     return recommendations[:7]  # Limit to top 7 recommendations
 

@@ -6,7 +6,10 @@ import re
 from pathlib import Path
 
 from agent_readiness_audit.models import RepoResult, ScanSummary
-from agent_readiness_audit.reporting.json_report import render_json_report, render_repo_json
+from agent_readiness_audit.reporting.json_report import (
+    render_json_report,
+    render_repo_json,
+)
 from agent_readiness_audit.reporting.markdown_report import (
     render_markdown_report,
     render_repo_markdown,

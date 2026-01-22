@@ -4,9 +4,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
-from agent_readiness_audit.config import load_config
 from agent_readiness_audit.models import AuditConfig, ReadinessLevel
 from agent_readiness_audit.scanner import find_repos, is_git_repo, scan_repo, scan_repos
 
@@ -88,7 +85,10 @@ class TestScanRepo:
 
         assert result.repo_name == "python-repo"
         assert result.score_total >= 10  # Should be decent score
-        assert result.level in [ReadinessLevel.SEMI_AUTONOMOUS, ReadinessLevel.AGENT_READY]
+        assert result.level in [
+            ReadinessLevel.SEMI_AUTONOMOUS,
+            ReadinessLevel.AGENT_READY,
+        ]
 
     def test_scan_agent_ready_repo(self, agent_ready_repo: Path) -> None:
         config = AuditConfig.default()
@@ -108,7 +108,9 @@ class TestScanRepo:
 class TestScanRepos:
     """Tests for scan_repos function."""
 
-    def test_scan_multiple_repos(self, temp_dir: Path, minimal_repo: Path, python_repo: Path) -> None:
+    def test_scan_multiple_repos(
+        self, temp_dir: Path, minimal_repo: Path, python_repo: Path
+    ) -> None:
         config = AuditConfig.default()
         summary = scan_repos([minimal_repo, python_repo], config)
 
@@ -116,7 +118,9 @@ class TestScanRepos:
         assert len(summary.repos) == 2
         assert summary.average_score > 0
 
-    def test_scan_summary_statistics(self, python_repo: Path, agent_ready_repo: Path) -> None:
+    def test_scan_summary_statistics(
+        self, python_repo: Path, agent_ready_repo: Path
+    ) -> None:
         config = AuditConfig.default()
         summary = scan_repos([python_repo, agent_ready_repo], config)
 
@@ -147,9 +151,13 @@ class TestScoringLevels:
         assert result1.level == ReadinessLevel.HUMAN_ONLY
 
         # Add README
-        (repo / "README.md").write_text("# Test\n\n## Installation\n\npip install test\n\n## Testing\n\npytest\n")
+        (repo / "README.md").write_text(
+            "# Test\n\n## Installation\n\npip install test\n\n## Testing\n\npytest\n"
+        )
         (repo / ".gitignore").write_text("*.pyc\n")
-        (repo / "pyproject.toml").write_text('[project]\nname = "test"\nrequires-python = ">=3.11"\n')
+        (repo / "pyproject.toml").write_text(
+            '[project]\nname = "test"\nrequires-python = ">=3.11"\n'
+        )
 
         result2 = scan_repo(repo, config)
         assert result2.score_total > result1.score_total

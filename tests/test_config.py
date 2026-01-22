@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
 from agent_readiness_audit.config import (
     find_config_file,
     generate_default_config,

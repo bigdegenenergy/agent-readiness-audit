@@ -12,13 +12,21 @@ from agent_readiness_audit.checks.base import (
 )
 
 # Dependency manifest files by ecosystem
-PYTHON_MANIFESTS = ["pyproject.toml", "setup.py", "setup.cfg", "requirements.txt", "Pipfile"]
+PYTHON_MANIFESTS = [
+    "pyproject.toml",
+    "setup.py",
+    "setup.cfg",
+    "requirements.txt",
+    "Pipfile",
+]
 NODE_MANIFESTS = ["package.json"]
 RUST_MANIFESTS = ["Cargo.toml"]
 GO_MANIFESTS = ["go.mod"]
 RUBY_MANIFESTS = ["Gemfile"]
 
-ALL_MANIFESTS = PYTHON_MANIFESTS + NODE_MANIFESTS + RUST_MANIFESTS + GO_MANIFESTS + RUBY_MANIFESTS
+ALL_MANIFESTS = (
+    PYTHON_MANIFESTS + NODE_MANIFESTS + RUST_MANIFESTS + GO_MANIFESTS + RUBY_MANIFESTS
+)
 
 # Lock files by ecosystem
 PYTHON_LOCKFILES = [
@@ -107,21 +115,21 @@ def check_runtime_version_declared(repo_path: Path) -> CheckResult:
 
     # Check pyproject.toml for requires-python
     pyproject = repo_path / "pyproject.toml"
-    if pyproject.exists():
-        if file_contains(pyproject, "requires-python", "python_requires"):
-            return CheckResult(
-                passed=True,
-                evidence="Found Python version requirement in pyproject.toml",
-            )
+    if pyproject.exists() and file_contains(
+        pyproject, "requires-python", "python_requires"
+    ):
+        return CheckResult(
+            passed=True,
+            evidence="Found Python version requirement in pyproject.toml",
+        )
 
     # Check package.json for engines
     package_json = repo_path / "package.json"
-    if package_json.exists():
-        if file_contains(package_json, '"engines"', '"node"'):
-            return CheckResult(
-                passed=True,
-                evidence="Found Node.js version requirement in package.json",
-            )
+    if package_json.exists() and file_contains(package_json, '"engines"', '"node"'):
+        return CheckResult(
+            passed=True,
+            evidence="Found Node.js version requirement in package.json",
+        )
 
     # Check .nvmrc for Node
     if file_exists(repo_path, ".nvmrc", ".node-version"):
@@ -139,12 +147,11 @@ def check_runtime_version_declared(repo_path: Path) -> CheckResult:
 
     # Check go.mod for Go version
     go_mod = repo_path / "go.mod"
-    if go_mod.exists():
-        if file_contains(go_mod, "go 1."):
-            return CheckResult(
-                passed=True,
-                evidence="Found Go version in go.mod",
-            )
+    if go_mod.exists() and file_contains(go_mod, "go 1."):
+        return CheckResult(
+            passed=True,
+            evidence="Found Go version in go.mod",
+        )
 
     return CheckResult(
         passed=False,

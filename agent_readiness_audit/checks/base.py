@@ -2,15 +2,16 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, TypeAlias
+from typing import TypeAlias
 
 from agent_readiness_audit.models import CheckResult as ModelCheckResult
 from agent_readiness_audit.models import CheckStatus
 
 # Registry of all checks
-_CHECK_REGISTRY: dict[str, "CheckDefinition"] = {}
+_CHECK_REGISTRY: dict[str, CheckDefinition] = {}
 
 
 @dataclass
@@ -21,7 +22,9 @@ class CheckResult:
     evidence: str = ""
     suggestion: str = ""
 
-    def to_model(self, name: str, category: str, weight: float = 1.0) -> ModelCheckResult:
+    def to_model(
+        self, name: str, category: str, weight: float = 1.0
+    ) -> ModelCheckResult:
         """Convert to model CheckResult."""
         return ModelCheckResult(
             name=name,
@@ -165,7 +168,9 @@ def dir_exists(repo_path: Path, *dirnames: str) -> Path | None:
     return None
 
 
-def file_contains(file_path: Path, *patterns: str, case_sensitive: bool = False) -> str | None:
+def file_contains(
+    file_path: Path, *patterns: str, case_sensitive: bool = False
+) -> str | None:
     """Check if file contains any of the given patterns.
 
     Args:

@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-import os
 import tempfile
+from collections.abc import Generator
 from pathlib import Path
-from typing import Generator
 
 import pytest
 
@@ -32,7 +31,9 @@ def minimal_repo(temp_dir: Path) -> Path:
     repo_path = temp_dir / "minimal-repo"
     repo_path.mkdir()
     (repo_path / ".git").mkdir()
-    (repo_path / "README.md").write_text("# Minimal Repo\n\n## Installation\n\npip install minimal\n")
+    (repo_path / "README.md").write_text(
+        "# Minimal Repo\n\n## Installation\n\npip install minimal\n"
+    )
     (repo_path / ".gitignore").write_text("__pycache__/\n*.pyc\n")
     return repo_path
 

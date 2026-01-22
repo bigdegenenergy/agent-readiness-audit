@@ -75,7 +75,9 @@ def render_repo_markdown(result: RepoResult) -> str:
     lines.append(f"### {result.repo_name}")
     lines.append("")
     lines.append(f"**Path:** `{result.repo_path}`")
-    lines.append(f"**Score:** {result.score_total:.1f}/{result.max_score:.0f} ({result.percentage:.0f}%)")
+    lines.append(
+        f"**Score:** {result.score_total:.1f}/{result.max_score:.0f} ({result.percentage:.0f}%)"
+    )
     lines.append(f"**Level:** {result.level.value}")
     lines.append("")
 

@@ -2,14 +2,9 @@
 
 from __future__ import annotations
 
-import sys
+import tomllib
 from pathlib import Path
 from typing import Any
-
-if sys.version_info >= (3, 11):
-    import tomllib
-else:
-    import tomli as tomllib
 
 from agent_readiness_audit.models import (
     AuditConfig,
@@ -154,7 +149,7 @@ def generate_default_config() -> str:
     Returns:
         TOML string with default configuration and comments.
     """
-    return '''# Agent Readiness Audit Configuration
+    return """# Agent Readiness Audit Configuration
 # This file customizes the scoring and check behavior
 
 [scoring]
@@ -286,4 +281,4 @@ include_recommendations = true
 
 # Show evidence details
 show_evidence = true
-'''
+"""
