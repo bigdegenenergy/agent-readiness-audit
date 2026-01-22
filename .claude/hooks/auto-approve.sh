@@ -165,9 +165,8 @@ if [[ "$TOOL_NAME" == "Bash" ]] && [[ -n "$BASH_COMMAND" ]]; then
         exit 0
     fi
 
-    # File listing/searching - safe
+    # File listing/searching - safe (except find with dangerous flags)
     if [[ "$BASH_COMMAND" =~ ^ls ]] || \
-       [[ "$BASH_COMMAND" =~ ^find ]] || \
        [[ "$BASH_COMMAND" =~ ^grep ]] || \
        [[ "$BASH_COMMAND" =~ ^rg ]] || \
        [[ "$BASH_COMMAND" =~ ^wc ]] || \
@@ -176,6 +175,16 @@ if [[ "$TOOL_NAME" == "Bash" ]] && [[ -n "$BASH_COMMAND" ]]; then
        [[ "$BASH_COMMAND" =~ ^cat ]]; then
         echo '{"decision": "approve"}'
         exit 0
+    fi
+
+    # find command - only approve if no dangerous flags
+    # -delete, -exec, -execdir, -ok, -okdir can modify files
+    if [[ "$BASH_COMMAND" =~ ^find ]]; then
+        if [[ ! "$BASH_COMMAND" =~ (-delete|-exec|-execdir|-ok|-okdir) ]]; then
+            echo '{"decision": "approve"}'
+            exit 0
+        fi
+        # Fall through to permission dialog for find with dangerous flags
     fi
 fi
 

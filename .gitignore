@@ -185,6 +185,7 @@ $RECYCLE.BIN/
 !CODE_OF_CONDUCT.md
 !SECURITY.md
 !AGENTS.md
+!CLAUDE.md
 !REVIEW_INSTRUCTIONS.md
 !docs/**/*.md
 out/
