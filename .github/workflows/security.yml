@@ -52,7 +52,7 @@ jobs:
       - name: ShellCheck Security Analysis
         run: |
           sudo apt-get install -y shellcheck
-          find .claude/hooks -name "*.sh" -exec shellcheck -S warning {} \; || true
+          find .claude/hooks -name "*.sh" -exec shellcheck -S warning {} \;
 
       - name: Check for dangerous patterns
         run: |
@@ -93,7 +93,7 @@ jobs:
 
       - name: Run Bandit Security Scan
         run: |
-          find .claude/hooks -name "*.py" -exec bandit -ll {} \; || true
+          find .claude/hooks -name "*.py" -exec bandit -ll {} \;
 
   dependency-review:
     name: Dependency Review
@@ -207,21 +207,10 @@ jobs:
             echo ""
           fi
 
-          echo "👤 Checking for full names..."
-          NAME_CONTEXT='(name|author|user|contact|owner|created[_ ]?by|assigned[_ ]?to|submitted[_ ]?by)\s*[:=]?\s*'
-          NAME_PATTERN="[A-Z][a-z]+\s+[A-Z][a-z]+"
-          NAME_EXCLUDES='Hello World|Lorem Ipsum|Foo Bar|John Doe|Jane Doe|Test User|Example User|First Last|Your Name'
-          NAME_FOUND=$(echo "$FILES" | xargs grep -lE "${NAME_CONTEXT}${NAME_PATTERN}" 2>/dev/null | while read -r file; do
-            if grep -E "${NAME_CONTEXT}${NAME_PATTERN}" "$file" 2>/dev/null | grep -vE "$NAME_EXCLUDES" | grep -qE "${NAME_CONTEXT}${NAME_PATTERN}"; then
-              echo "$file"
-            fi
-          done | head -5)
-          if [ -n "$NAME_FOUND" ]; then
-            echo "⛔ Full names found in:"
-            echo "$NAME_FOUND" | sed 's/^/   /'
-            EXIT_CODE=1
-            echo ""
-          fi
+          # Full names detection DISABLED - too many false positives
+          # Heuristic name detection matches normal Title Case prose and is too
+          # noisy for a CI blocker. Use manual review or ML-based PII detection instead.
+          echo "👤 Full name detection: skipped (disabled due to false positives)"
 
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
           if [ $EXIT_CODE -eq 0 ]; then

@@ -68,18 +68,12 @@ if [[ "$TOOL_NAME" == "Bash" ]] && [[ -n "$BASH_COMMAND" ]]; then
         exit 0
     fi
 
-    # Test commands - always safe
-    if [[ "$BASH_COMMAND" =~ ^npm\ test ]] || \
-       [[ "$BASH_COMMAND" =~ ^pnpm\ test ]] || \
-       [[ "$BASH_COMMAND" =~ ^yarn\ test ]] || \
-       [[ "$BASH_COMMAND" =~ ^pytest ]] || \
-       [[ "$BASH_COMMAND" =~ ^python\ -m\ pytest ]] || \
-       [[ "$BASH_COMMAND" =~ ^cargo\ test ]] || \
-       [[ "$BASH_COMMAND" =~ ^go\ test ]] || \
-       [[ "$BASH_COMMAND" =~ ^make\ test ]]; then
-        echo '{"decision": "approve"}'
-        exit 0
-    fi
+    # Test commands - REMOVED from auto-approve
+    # Security: Test runners execute code from config files (package.json scripts,
+    # pytest fixtures, Makefile targets). If the agent can modify these files and
+    # then auto-run tests, it could execute arbitrary code without human approval.
+    # Test commands now require manual approval to maintain the security boundary.
+    # This matches the approach already taken for build commands.
 
     # Lint commands - safe, read-only
     if [[ "$BASH_COMMAND" =~ ^npm\ run\ lint ]] || \
