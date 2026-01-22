@@ -1,7 +1,6 @@
 # Agent Readiness Audit
 
 [![CI](https://github.com/bigdegenenergy/agent-readiness-audit/actions/workflows/ci.yml/badge.svg)](https://github.com/bigdegenenergy/agent-readiness-audit/actions/workflows/ci.yml)
-[![PyPI version](https://badge.fury.io/py/agent-readiness-audit.svg)](https://badge.fury.io/py/agent-readiness-audit)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
@@ -96,25 +95,25 @@ readme_exists = { enabled = true, weight = 1.0 }
 
 Repositories are scored on a 0-16 point scale across 8 categories, each worth up to 2 points.
 
-| Category | Description | Max Points |
-|----------|-------------|------------|
-| Discoverability | README presence and onboarding clarity | 2 |
-| Deterministic Setup | Reproducible dependency management | 2 |
-| Build and Run | Standard commands for build/test/lint | 2 |
-| Test Feedback Loop | Test infrastructure and runnability | 2 |
-| Static Guardrails | Linting, formatting, type checking | 2 |
-| Observability | Logging and error handling | 2 |
-| CI Enforcement | Continuous integration configuration | 2 |
-| Security & Governance | Security policies and hygiene | 2 |
+| Category              | Description                            | Max Points |
+| --------------------- | -------------------------------------- | ---------- |
+| Discoverability       | README presence and onboarding clarity | 2          |
+| Deterministic Setup   | Reproducible dependency management     | 2          |
+| Build and Run         | Standard commands for build/test/lint  | 2          |
+| Test Feedback Loop    | Test infrastructure and runnability    | 2          |
+| Static Guardrails     | Linting, formatting, type checking     | 2          |
+| Observability         | Logging and error handling             | 2          |
+| CI Enforcement        | Continuous integration configuration   | 2          |
+| Security & Governance | Security policies and hygiene          | 2          |
 
 Scores map to readiness levels:
 
-| Score Range | Level | Description |
-|-------------|-------|-------------|
-| 0-5 | Human-Only Repo | Requires significant human guidance |
-| 6-9 | Assisted Agent | Agents can help with supervision |
-| 10-13 | Semi-Autonomous | Agents can work with minimal oversight |
-| 14-16 | Agent-Ready Factory | Fully optimized for autonomous agents |
+| Score Range | Level               | Description                            |
+| ----------- | ------------------- | -------------------------------------- |
+| 0-5         | Human-Only Repo     | Requires significant human guidance    |
+| 6-9         | Assisted Agent      | Agents can help with supervision       |
+| 10-13       | Semi-Autonomous     | Agents can work with minimal oversight |
+| 14-16       | Agent-Ready Factory | Fully optimized for autonomous agents  |
 
 ## Adding Checks (Plugin Model)
 
