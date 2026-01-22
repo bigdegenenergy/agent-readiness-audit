@@ -4,46 +4,54 @@
 
 ```toml
 [review]
-summary = "This PR introduces a comprehensive AI agent toolkit but significantly degrades the repository's quality assurance standards by removing automated tests and strict linting from CI. Furthermore, the newly introduced shell hooks contain security vulnerabilities related to temporary file handling, and the workflow configurations have permission defects regarding forked repositories."
+summary = "This PR sets up a robust agentic workflow but introduces critical security risks and regressions. The existing application CI pipeline has been deleted, and the new agent configuration grants excessive autonomy for code execution via build tools. Additionally, the dependency on an external repository for syncing executable hooks represents a supply chain vulnerability."
 decision = "REQUEST_CHANGES"
 
 [[issues]]
 severity = "critical"
 file = ".github/workflows/ci.yml"
 line = 1
-title = "Critical regression in CI pipeline"
-description = "The changes to `ci.yml` remove the `typecheck`, `test`, and `integration` jobs and set `continue-on-error: true` for the `lint` job. This effectively disables all quality gates for the application code. While the new configuration validation jobs are useful, they should not replace unit tests and standard linting."
-suggestion = "Restore the original testing and linting jobs. Add the new `validate-config` jobs alongside them."
+title = "Existing CI/CD pipeline deleted"
+description = "The new CI configuration removes `typecheck`, `test`, and `integration` jobs, replacing them with `.claude` config validation. This effectively disables all automated testing for the application code."
+suggestion = "Restore the original testing jobs (pytest, mypy, etc.) alongside the new validation steps."
 
 [[issues]]
 severity = "critical"
-file = ".claude/hooks/post-tool-use.sh"
-line = 1
-title = "Insecure temporary file creation (Symlink Vulnerability)"
-description = "The script uses a predictable fixed path `/tmp/claude_last_run`. In a shared environment, a malicious user can pre-create a symlink at this location to cause the script to overwrite or modify arbitrary files owned by the user running the agent. This same issue exists in `.claude/hooks/stop.sh` with `/tmp/claude_test_output.log`."
-suggestion = "Use `mktemp` to create secure, randomized temporary files. Example: `TEMP_FILE=$(mktemp)`."
-
-[[issues]]
-severity = "important"
-file = ".github/workflows/pii-scan-content.yml"
-line = 1
-title = "Workflow failure on forked PRs"
-description = "This workflow triggers on `pull_request` and attempts to post a comment using `GITHUB_TOKEN`. For PRs originating from forks (common in public repos), the token is read-only, causing this workflow to fail execution when calling `github.issues.createComment`."
-suggestion = "Check `if (context.payload.pull_request.head.repo.fork)` and skip the commenting step, or just log the warning to the action output without failing."
-
-[[issues]]
-severity = "important"
-file = ".gitignore"
-line = 1
-title = "Committing local configuration files"
-description = "The `.gitignore` explicitly whitelists `.claude/settings.local.json`. The `.local` suffix conventionally indicates machine-specific configuration or secrets that should never be version-controlled."
-suggestion = "Remove `!/claude/settings.local.json` from `.gitignore`. This file should remain ignored."
-
-[[issues]]
-severity = "important"
 file = ".claude/hooks/auto-approve.sh"
 line = 1
-title = "Unsafe auto-approval of build tools"
-description = "The whitelist includes `npm run build`, `make`, etc. Since the agent can edit `package.json` or `Makefile` (via the Write tool) and then immediately run these commands (via the Bash tool), it can execute arbitrary code without human approval, bypassing the intent of the safety net."
-suggestion = "Remove build/execution tools (`npm run`, `make`) from the auto-approve whitelist, or ensure the agent hasn't modified the configuration files they rely on in the same session."
+title = "Privilege escalation via auto-approved build commands"
+description = "The script auto-approves `npm run`, `make`, and other build commands. Since the agent can edit `package.json` or `Makefile`, it can inject malicious commands into these files and then execute them without user confirmation, bypassing the intended safety net."
+suggestion = "Remove `npm run`, `make`, and `docker` from the auto-approve allowlist. These commands execute code defined in files the agent can modify."
+
+[[issues]]
+severity = "critical"
+file = ".github/workflows/sync-claude-config.yml"
+line = 1
+title = "Supply chain vulnerability via upstream sync"
+description = "The workflow automatically fetches executable hooks and workflows from `bigdegenenergy/ai-dev-toolkit`. If that repository is compromised or malicious, it allows remote code execution in this repository."
+suggestion = "Remove the automated sync workflow or pin it to a specific trusted commit hash/tag. Ensure strict code review policies are enforced on PRs generated by this workflow."
+
+[[issues]]
+severity = "important"
+file = ".github/workflows/notify-on-failure.yml"
+line = 0
+title = "JSON Injection in Slack payload"
+description = "The Slack payload is constructed using direct string interpolation of `${{ github.event.workflow_run.head_branch }}`. If the branch name contains quotes, it will break the JSON structure."
+suggestion = "Use an environment variable and `jq` to safely construct the JSON payload, similar to how the Discord notification is handled in the same file."
+
+[[issues]]
+severity = "important"
+file = ".claude/hooks/post-tool-use.sh"
+line = 1
+title = "Performance and supply chain risk in formatter"
+description = "Running `npx prettier --write .` on the entire repository after every tool use is extremely inefficient and will degrade agent performance. Additionally, using `npx` without version pinning downloads the latest package version every time, introducing supply chain risk."
+suggestion = "Use `npm exec` to use the project's installed prettier version, and restrict formatting to the specific files changed by the agent (passed as arguments to the hook)."
+
+[[issues]]
+severity = "suggestion"
+file = ".gitignore"
+line = 0
+title = "Local settings file should be ignored"
+description = "The pattern `!.claude/settings.local.json` un-ignores the local settings file, causing it to be tracked in git. Local settings typically contain machine-specific paths or secrets and should not be committed."
+suggestion = "Remove `!.claude/settings.local.json` or change it to ensure the file remains ignored."
 ```
