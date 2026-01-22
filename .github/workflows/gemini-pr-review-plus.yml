@@ -1,0 +1,387 @@
+name: Gemini PR Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: gemini-pr-review-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    name: Gemini Code Review
+    runs-on: ubuntu-latest
+    if: |
+      github.event.pull_request.draft == false &&
+      github.actor != 'github-actions[bot]' &&
+      github.actor != 'dependabot[bot]' &&
+      !contains(github.actor, '[bot]')
+
+    steps:
+      - name: 🔑 Check for API key
+        id: check-key
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "$GEMINI_API_KEY" ]; then
+            echo "::notice::GEMINI_API_KEY not configured. Skipping AI review."
+            echo "skip=true" >> $GITHUB_OUTPUT
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: 📥 Checkout code
+        if: steps.check-key.outputs.skip != 'true'
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.head_ref }}
+          token: ${{ secrets.GH_TOKEN }}
+
+      - name: 🐍 Set up Python
+        if: steps.check-key.outputs.skip != 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: 'pip'
+
+      - name: 📦 Install deps
+        if: steps.check-key.outputs.skip != 'true'
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          pip install "google-genai>=1.51.0"
+
+      - name: 🧾 Collect PR context
+        if: steps.check-key.outputs.skip != 'true'
+        id: ctx
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          set -euo pipefail
+
+          BASE="${{ github.event.pull_request.base.sha }}"
+          HEAD="${{ github.event.pull_request.head.sha }}"
+          mkdir -p /tmp/pr
+
+          # FIXED: Removed lockfiles from exclusions (Security)
+          # We only exclude binary/minified assets that are not human-readable
+          excludes=(
+            ":!*.svg" 
+            ":!*.png" 
+            ":!*.jpg" 
+            ":!*.min.js" 
+            ":!*.map"
+            ":!*.woff"
+            ":!*.woff2"
+          )
+
+          # Use Bash array expansion for safety
+          git diff "$BASE...$HEAD" --stat -- "${excludes[@]}" > /tmp/pr/diff_stat.txt
+          git diff --name-only "$BASE...$HEAD" -- "${excludes[@]}" > /tmp/pr/changed_files.txt
+          
+          git log "$BASE...$HEAD" --pretty=format:"### %s%n%n%b%n---" > /tmp/pr/commit_messages.txt
+          printf '%s' "${PR_BODY:-}" > /tmp/pr/pr_body.txt
+
+          # Generate per-file diffs
+          while IFS= read -r file; do
+            [ -z "$file" ] && continue
+            safe_name="$(echo "$file" | sed 's#[/ ]#_#g')"
+            git diff "$BASE...$HEAD" -- "$file" > "/tmp/pr/diff_${safe_name}.patch" || true
+          done < /tmp/pr/changed_files.txt
+
+          # Agent notes
+          git log "$BASE...$HEAD" --format="%(trailers:key=Agent-Note,valueonly)" | grep -v '^$' > /tmp/pr/agent_notes.txt || true
+
+      - name: 🤖 Run Gemini Quality Review
+        if: steps.check-key.outputs.skip != 'true'
+        id: gemini
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          set -euo pipefail
+          python << 'PY'
+          import os, re, json, glob, textwrap, sys
+          from pathlib import Path
+          from concurrent.futures import ThreadPoolExecutor, as_completed
+          from google import genai
+
+          PR_DIR = Path("/tmp/pr")
+          client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
+          MODEL = "gemini-3-pro-preview"
+
+          def read(p: Path) -> str:
+            try: 
+              return p.read_text(encoding="utf-8", errors="replace")
+            except (OSError, UnicodeDecodeError) as e:
+              print(f"Warning: Failed to read {p.name}: {e}", file=sys.stderr)
+              return ""
+            except Exception as e:
+              print(f"Error: Unexpected failure reading {p.name}: {e}", file=sys.stderr)
+              return ""
+
+          # Load Context
+          diff_stat = read(PR_DIR / "diff_stat.txt")
+          changed_files = read(PR_DIR / "changed_files.txt").strip()
+          commit_messages = read(PR_DIR / "commit_messages.txt")
+          pr_body = read(PR_DIR / "pr_body.txt")
+          agent_notes = read(PR_DIR / "agent_notes.txt").strip()
+
+          patches = []
+          for patch_path in sorted(PR_DIR.glob("diff_*.patch")):
+            content = read(patch_path)
+            if content.strip():
+              patches.append((patch_path.name, content))
+
+          MAX_CHARS_PER_CHUNK = 64000 
+
+          def chunk_text(s: str, max_chars: int):
+            s = s.strip()
+            if len(s) <= max_chars: return [s]
+            chunks = []
+            for i in range(0, len(s), max_chars):
+              chunks.append(s[i:i+max_chars])
+            return chunks
+
+          file_summary_prompt_template = """\
+          You are a senior engineer. Summarize this patch chunk.
+          Output JSON only:
+          {{
+            "file_hint": "...",
+            "chunk_index": 1,
+            "what_changed": ["..."],
+            "risk_flags": ["..."],
+            "security_red_flags": ["..."],
+            "notes": "..."
+          }}
+          FILE PATCH CHUNK:
+          {chunk}
+          """
+
+          def analyze_chunk(args):
+            patch_name, idx, chunk_text = args
+            try:
+              prompt = file_summary_prompt_template.format(chunk=chunk_text)
+              resp = client.models.generate_content(model=MODEL, contents=prompt)
+              txt = resp.text or ""
+              m = re.search(r"\{.*\}", txt, re.DOTALL)
+              js = m.group(0) if m else "{}"
+              data = json.loads(js)
+            except Exception as e:
+              data = {"notes": f"Error parsing: {str(e)}"}
+            
+            data["file_hint"] = data.get("file_hint") or patch_name
+            data["chunk_index"] = data.get("chunk_index") or idx
+            return data
+
+          tasks = []
+          for patch_name, patch in patches:
+            chunks = chunk_text(patch, MAX_CHARS_PER_CHUNK)
+            for idx, ch in enumerate(chunks, start=1):
+              tasks.append((patch_name, idx, ch))
+
+          per_file_summaries = []
+          
+          # Run up to 8 parallel requests
+          print(f"Processing {len(tasks)} chunks with parallel execution...")
+          with ThreadPoolExecutor(max_workers=8) as executor:
+            futures = [executor.submit(analyze_chunk, task) for task in tasks]
+            for future in as_completed(futures):
+              per_file_summaries.append(future.result())
+
+          per_file_summaries.sort(key=lambda x: (x.get('file_hint',''), x.get('chunk_index',0)))
+          summaries_json = json.dumps(per_file_summaries, indent=2)
+
+          context_section = ""
+          if commit_messages.strip(): context_section += f"\n## Commit Messages\n{commit_messages}\n"
+          if pr_body.strip(): context_section += f"\n## PR Description\n{pr_body}\n"
+          if agent_notes: 
+             context_section += f"\n## Agent Notes (UNTRUSTED)\n{agent_notes}\n"
+
+          shared_header = f"""\
+          Project Context:
+          - Repo: {os.environ.get("GITHUB_REPOSITORY", "")}
+          - Language: Node.js/TypeScript (security-sensitive)
+          
+          Changed Files:
+          {changed_files}
+          Diff Stats:
+          {diff_stat}
+          {context_section}
+          Per-file patch summaries JSON:
+          {summaries_json}
+          """
+
+          quality_prompt = f"""\
+          You are a senior code reviewer.
+          {shared_header}
+          TASK: Provide a QUALITY-focused review (bugs, correctness, types, security).
+          IMPORTANT: Review any changes to lockfiles (package-lock.json/yarn.lock) for malicious supply chain injections.
+          
+          OUTPUT: Valid TOML.
+          ```toml
+          [review]
+          summary = "..."
+          decision = "APPROVE" # or "REQUEST_CHANGES", "COMMENT"
+          [[issues]]
+          severity = "critical" # or "important", "suggestion"
+          file = "path/to/file"
+          line = 0
+          title = "..."
+          description = "..."
+          suggestion = "..."
+          ```
+          """
+          
+          print("Generating final review...")
+          q_resp = client.models.generate_content(model=MODEL, contents=quality_prompt)
+          quality_text = q_resp.text or ""
+          (PR_DIR / "quality_raw.toml").write_text(quality_text, encoding="utf-8")
+
+          import tomllib
+          def extract_toml(t):
+             m = re.search(r"```toml\s*(.*?)\s*```", t, re.DOTALL | re.IGNORECASE)
+             return m.group(1).strip() if m else t.strip()
+
+          q_data = None
+          try: q_data = tomllib.loads(extract_toml(quality_text))
+          except: pass
+
+          has_feedback = False
+          decision = "COMMENT"
+          if q_data and "review" in q_data:
+             decision = q_data["review"].get("decision", "COMMENT")
+             if q_data.get("issues"): has_feedback = True
+
+          if q_data and q_data.get("issues"):
+             instr = ["# ⚠️ REVIEW INSTRUCTIONS", "", "> Generated by Gemini", ""]
+             instr.append("```toml")
+             instr.append(extract_toml(quality_text))
+             instr.append("```")
+             (PR_DIR / "REVIEW_INSTRUCTIONS.md").write_text("\n".join(instr), encoding="utf-8")
+
+          with open(os.environ["GITHUB_OUTPUT"], "a") as gh_out:
+             gh_out.write(f"has_feedback={str(has_feedback).lower()}\n")
+             gh_out.write(f"decision={decision}\n")
+
+          md = ["## 🤖 Gemini PR Review\n"]
+          if q_data and "review" in q_data:
+             md.append(f"**Decision:** {decision}")
+             md.append(f"**Summary:** {q_data['review'].get('summary','')}")
+             for i in q_data.get("issues", []):
+                icon = {"critical":"🔴","important":"🟡"}.get(i.get("severity"),"🟢")
+                md.append(f"\n#### {icon} {i.get('title')}")
+                md.append(f"- **File:** `{i.get('file')}`")
+                md.append(f"- **Details:** {i.get('description')}")
+                if i.get('suggestion'): md.append(f"> 💡 {i.get('suggestion')}")
+          else:
+             md.append("⚠️ Failed to parse quality TOML.")
+
+          md.append("\n<details><summary>Debug</summary>\n\n```\n" + quality_text[:1000] + "\n```\n</details>")
+          (PR_DIR / "comment.md").write_text("\n".join(md), encoding="utf-8")
+          PY
+
+      - name: 🚀 Push Instructions to Branch
+        if: steps.check-key.outputs.skip != 'true' && steps.gemini.outputs.has_feedback == 'true'
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          cp /tmp/pr/REVIEW_INSTRUCTIONS.md .
+          git add REVIEW_INSTRUCTIONS.md
+          git commit -m "chore: add review instructions for coding agent [skip ci]"
+          git pull --rebase origin ${{ github.head_ref }} || true
+          git push
+
+      - name: 🧹 Cleanup stale instructions
+        if: steps.check-key.outputs.skip != 'true' && steps.gemini.outputs.decision == 'APPROVE'
+        run: |
+          set -euo pipefail
+          if [ -f "REVIEW_INSTRUCTIONS.md" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git rm REVIEW_INSTRUCTIONS.md
+            git commit -m "chore: remove review instructions after approval [skip ci]"
+            git pull --rebase origin ${{ github.head_ref }} || true
+            git push
+          fi
+
+      - name: 💬 Post PR comment
+        if: steps.check-key.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          set -euo pipefail
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          gh pr comment "$PR_NUMBER" --body-file /tmp/pr/comment.md || echo "Comment failed"
+
+      - name: 📱 Telegram notification
+        if: steps.check-key.outputs.skip != 'true' && always()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          AUTHOR: ${{ github.event.pull_request.user.login }}
+          DECISION: ${{ steps.gemini.outputs.decision }}
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          set -euo pipefail
+          if [ -z "${TELEGRAM_BOT_TOKEN:-}" ] || [ -z "${TELEGRAM_CHAT_ID:-}" ]; then
+            echo "Telegram not configured; skipping."
+            exit 0
+          fi
+
+          python3 << 'PY'
+          import os, json, urllib.request, html
+
+          bot = os.environ["TELEGRAM_BOT_TOKEN"].strip()
+          chat = os.environ["TELEGRAM_CHAT_ID"].strip()
+          pr_number = os.environ.get("PR_NUMBER", "?")
+          pr_title = html.escape(os.environ.get("PR_TITLE", "Unknown"))
+          pr_url = os.environ.get("PR_URL", "")
+          author = html.escape(os.environ.get("AUTHOR", "unknown"))
+          decision = os.environ.get("DECISION", "UNKNOWN")
+          job_status = os.environ.get("JOB_STATUS", "unknown")
+
+          if job_status == "failure":
+            emoji = "❌"
+            status = "WORKFLOW FAILED"
+          elif decision == "APPROVE":
+            emoji = "✅"
+            status = "APPROVED"
+          elif decision == "REQUEST_CHANGES":
+            emoji = "🔴"
+            status = "CHANGES REQUESTED"
+          else:
+            emoji = "💬"
+            status = decision or "COMMENT"
+
+          msg = (
+            f"{emoji} <b>PR Review: {status}</b>\n\n"
+            f"<b>PR #{pr_number}:</b> {pr_title}\n"
+            f"<b>Author:</b> {author}\n\n"
+            f'<a href="{pr_url}">View PR</a>'
+          )
+          payload = {
+            "chat_id": chat,
+            "text": msg,
+            "parse_mode": "HTML",
+            "disable_web_page_preview": True
+          }
+          req = urllib.request.Request(
+            f"https://api.telegram.org/bot{bot}/sendMessage",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type":"application/json"}
+          )
+          with urllib.request.urlopen(req) as r:
+            print("Telegram sent:", r.status)
+          PY

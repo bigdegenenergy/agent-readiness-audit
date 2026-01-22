@@ -24,7 +24,8 @@ def check_gitignore_present(repo_path: Path) -> CheckResult:
         # Check if it has meaningful content
         content = gitignore.read_text(encoding="utf-8", errors="ignore")
         non_empty_lines = [
-            line for line in content.splitlines()
+            line
+            for line in content.splitlines()
             if line.strip() and not line.strip().startswith("#")
         ]
         if non_empty_lines:
@@ -105,14 +106,14 @@ def check_env_example_or_secrets_docs_present(repo_path: Path) -> CheckResult:
     # Check if project likely needs env vars
     has_env_usage = False
     pyproject = repo_path / "pyproject.toml"
-    if pyproject.exists():
-        if file_contains(pyproject, "python-dotenv", "environs", "pydantic-settings"):
-            has_env_usage = True
+    if pyproject.exists() and file_contains(
+        pyproject, "python-dotenv", "environs", "pydantic-settings"
+    ):
+        has_env_usage = True
 
     package_json = repo_path / "package.json"
-    if package_json.exists():
-        if file_contains(package_json, "dotenv", "env"):
-            has_env_usage = True
+    if package_json.exists() and file_contains(package_json, "dotenv", "env"):
+        has_env_usage = True
 
     if has_env_usage:
         return CheckResult(
@@ -152,23 +153,25 @@ def check_security_policy_present_or_baseline(repo_path: Path) -> CheckResult:
 
     # Check for security-related content in other files
     contributing = repo_path / "CONTRIBUTING.md"
-    if contributing.exists():
-        if file_contains(contributing, "security", "vulnerability", "responsible disclosure"):
-            return CheckResult(
-                passed=True,
-                evidence="Found security guidance in CONTRIBUTING.md",
-            )
+    if contributing.exists() and file_contains(
+        contributing, "security", "vulnerability", "responsible disclosure"
+    ):
+        return CheckResult(
+            passed=True,
+            evidence="Found security guidance in CONTRIBUTING.md",
+        )
 
     # Check README for security section
     readme_files = ["README.md", "README.MD", "README", "readme.md"]
     for readme_name in readme_files:
         readme = repo_path / readme_name
-        if readme.exists():
-            if file_contains(readme, "## security", "### security", "# security"):
-                return CheckResult(
-                    passed=True,
-                    evidence="Found security section in README",
-                )
+        if readme.exists() and file_contains(
+            readme, "## security", "### security", "# security"
+        ):
+            return CheckResult(
+                passed=True,
+                evidence="Found security section in README",
+            )
 
     # Check for GitHub security features
     github_dir = repo_path / ".github"

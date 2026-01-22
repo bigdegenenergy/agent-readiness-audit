@@ -60,30 +60,29 @@ def check_package_scripts_or_equivalent(repo_path: Path) -> CheckResult:
     """Check if package scripts exist."""
     # Check package.json scripts
     package_json = repo_path / "package.json"
-    if package_json.exists():
-        if file_contains(package_json, '"scripts"'):
-            return CheckResult(
-                passed=True,
-                evidence="Found scripts section in package.json",
-            )
+    if package_json.exists() and file_contains(package_json, '"scripts"'):
+        return CheckResult(
+            passed=True,
+            evidence="Found scripts section in package.json",
+        )
 
     # Check pyproject.toml scripts
     pyproject = repo_path / "pyproject.toml"
-    if pyproject.exists():
-        if file_contains(pyproject, "[project.scripts]", "[tool.poetry.scripts]", "[tool.hatch.envs"):
-            return CheckResult(
-                passed=True,
-                evidence="Found scripts/commands in pyproject.toml",
-            )
+    if pyproject.exists() and file_contains(
+        pyproject, "[project.scripts]", "[tool.poetry.scripts]", "[tool.hatch.envs"
+    ):
+        return CheckResult(
+            passed=True,
+            evidence="Found scripts/commands in pyproject.toml",
+        )
 
     # Check Cargo.toml for binaries
     cargo_toml = repo_path / "Cargo.toml"
-    if cargo_toml.exists():
-        if file_contains(cargo_toml, "[[bin]]", "[package]"):
-            return CheckResult(
-                passed=True,
-                evidence="Found binary/package definition in Cargo.toml",
-            )
+    if cargo_toml.exists() and file_contains(cargo_toml, "[[bin]]", "[package]"):
+        return CheckResult(
+            passed=True,
+            evidence="Found binary/package definition in Cargo.toml",
+        )
 
     # Check for task runner as fallback
     runner = file_exists(repo_path, *TASK_RUNNERS)
@@ -135,12 +134,11 @@ def check_documented_commands_present(repo_path: Path) -> CheckResult:
 
     # Check for Makefile with help target
     makefile = file_exists(repo_path, "Makefile", "makefile", "GNUmakefile")
-    if makefile:
-        if file_contains(makefile, ".PHONY", "help:"):
-            return CheckResult(
-                passed=True,
-                evidence="Found Makefile with targets (likely self-documenting)",
-            )
+    if makefile and file_contains(makefile, ".PHONY", "help:"):
+        return CheckResult(
+            passed=True,
+            evidence="Found Makefile with targets (likely self-documenting)",
+        )
 
     # Check for CONTRIBUTING.md with commands
     contributing = repo_path / "CONTRIBUTING.md"

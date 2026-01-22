@@ -22,7 +22,9 @@ def check_logging_present(repo_path: Path) -> CheckResult:
     # Check Python files for logging
     py_files = glob_files(repo_path, "**/*.py")
     for py_file in py_files[:50]:  # Limit search to avoid slowdown
-        if file_contains(py_file, "import logging", "from logging", "getLogger", "structlog"):
+        if file_contains(
+            py_file, "import logging", "from logging", "getLogger", "structlog"
+        ):
             return CheckResult(
                 passed=True,
                 evidence=f"Found logging usage in {py_file.relative_to(repo_path)}",
@@ -45,21 +47,23 @@ def check_logging_present(repo_path: Path) -> CheckResult:
 
     # Check pyproject.toml for structlog or loguru
     pyproject = repo_path / "pyproject.toml"
-    if pyproject.exists():
-        if file_contains(pyproject, "structlog", "loguru", "logging"):
-            return CheckResult(
-                passed=True,
-                evidence="Found logging dependency in pyproject.toml",
-            )
+    if pyproject.exists() and file_contains(
+        pyproject, "structlog", "loguru", "logging"
+    ):
+        return CheckResult(
+            passed=True,
+            evidence="Found logging dependency in pyproject.toml",
+        )
 
     # Check requirements for logging libraries
     requirements = repo_path / "requirements.txt"
-    if requirements.exists():
-        if file_contains(requirements, "structlog", "loguru", "python-json-logger"):
-            return CheckResult(
-                passed=True,
-                evidence="Found logging library in requirements.txt",
-            )
+    if requirements.exists() and file_contains(
+        requirements, "structlog", "loguru", "python-json-logger"
+    ):
+        return CheckResult(
+            passed=True,
+            evidence="Found logging library in requirements.txt",
+        )
 
     # Check JavaScript/TypeScript for logging
     js_files = glob_files(repo_path, "**/*.js") + glob_files(repo_path, "**/*.ts")
@@ -72,12 +76,13 @@ def check_logging_present(repo_path: Path) -> CheckResult:
 
     # Check package.json for logging libraries
     package_json = repo_path / "package.json"
-    if package_json.exists():
-        if file_contains(package_json, "winston", "pino", "bunyan", "log4js"):
-            return CheckResult(
-                passed=True,
-                evidence="Found logging library in package.json",
-            )
+    if package_json.exists() and file_contains(
+        package_json, "winston", "pino", "bunyan", "log4js"
+    ):
+        return CheckResult(
+            passed=True,
+            evidence="Found logging library in package.json",
+        )
 
     return CheckResult(
         passed=False,
@@ -98,10 +103,10 @@ def check_structured_errors_present(repo_path: Path) -> CheckResult:
     for py_file in py_files[:50]:
         if file_contains(
             py_file,
-            "class.*Error",
-            "class.*Exception",
-            "raise.*Error",
-            "except.*as",
+            "(Exception)",  # Class inheriting from Exception
+            "(Error)",  # Class inheriting from Error
+            "raise ",  # Raise statements
+            "except ",  # Exception handling
             "@dataclass",
             "pydantic",
         ):
@@ -139,14 +144,18 @@ def check_structured_errors_present(repo_path: Path) -> CheckResult:
     # Check TypeScript for custom error classes
     ts_files = glob_files(repo_path, "**/*.ts")
     for ts_file in ts_files[:50]:
-        if file_contains(ts_file, "extends Error", "class.*Error", "interface.*Error"):
+        if file_contains(ts_file, "extends Error", "Error {", "Error<"):
             return CheckResult(
                 passed=True,
                 evidence=f"Found structured error handling in {ts_file.relative_to(repo_path)}",
             )
 
     # Check for Result types (Rust-style error handling)
-    if file_contains(repo_path / "Cargo.toml", "thiserror", "anyhow") if (repo_path / "Cargo.toml").exists() else False:
+    if (
+        file_contains(repo_path / "Cargo.toml", "thiserror", "anyhow")
+        if (repo_path / "Cargo.toml").exists()
+        else False
+    ):
         return CheckResult(
             passed=True,
             evidence="Found Rust error handling libraries (thiserror/anyhow)",

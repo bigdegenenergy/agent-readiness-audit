@@ -123,7 +123,9 @@ def render_detailed_repo(result: RepoResult, console: Console) -> None:
 
         cat_table.add_row(
             cat_name.replace("_", " ").title(),
-            Text(f"{cat_score.score:.1f}/{cat_score.max_points:.0f}", style=score_color),
+            Text(
+                f"{cat_score.score:.1f}/{cat_score.max_points:.0f}", style=score_color
+            ),
             f"{cat_score.passed_checks}/{cat_score.total_checks}",
             status,
         )

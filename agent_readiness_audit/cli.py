@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-import sys
 from enum import Enum
 from pathlib import Path
-from typing import Annotated, Optional
+from typing import Annotated
 
 import typer
 from rich.console import Console
@@ -18,7 +17,7 @@ from agent_readiness_audit.reporting import (
     render_table_report,
     write_artifacts,
 )
-from agent_readiness_audit.scanner import find_repos, is_git_repo, scan_repo, scan_repos
+from agent_readiness_audit.scanner import find_repos, is_git_repo, scan_repos
 
 app = typer.Typer(
     name="ara",
@@ -56,7 +55,7 @@ def version_callback(value: bool) -> None:
 @app.callback()
 def main(
     version: Annotated[
-        Optional[bool],
+        bool | None,
         typer.Option(
             "--version",
             "-v",
@@ -73,7 +72,7 @@ def main(
 @app.command()
 def scan(
     repo: Annotated[
-        Optional[Path],
+        Path | None,
         typer.Option(
             "--repo",
             "-r",
@@ -85,7 +84,7 @@ def scan(
         ),
     ] = None,
     root: Annotated[
-        Optional[Path],
+        Path | None,
         typer.Option(
             "--root",
             help="Path containing multiple repos to scan.",
@@ -106,7 +105,7 @@ def scan(
         ),
     ] = 2,
     include: Annotated[
-        Optional[str],
+        str | None,
         typer.Option(
             "--include",
             "-i",
@@ -114,7 +113,7 @@ def scan(
         ),
     ] = None,
     exclude: Annotated[
-        Optional[str],
+        str | None,
         typer.Option(
             "--exclude",
             "-e",
@@ -122,7 +121,7 @@ def scan(
         ),
     ] = None,
     config: Annotated[
-        Optional[Path],
+        Path | None,
         typer.Option(
             "--config",
             "-c",
@@ -143,7 +142,7 @@ def scan(
         ),
     ] = OutputFormat.TABLE,
     out: Annotated[
-        Optional[Path],
+        Path | None,
         typer.Option(
             "--out",
             "-o",
@@ -162,7 +161,7 @@ def scan(
         ),
     ] = False,
     min_score: Annotated[
-        Optional[int],
+        int | None,
         typer.Option(
             "--min-score",
             help="Override minimum score required to pass (0-16).",
@@ -201,13 +200,17 @@ def scan(
     elif repo:
         # Scan single repo
         if not is_git_repo(repo):
-            err_console.print(f"[yellow]Warning: {repo} does not appear to be a git repository[/yellow]")
+            err_console.print(
+                f"[yellow]Warning: {repo} does not appear to be a git repository[/yellow]"
+            )
         repos_to_scan = [repo]
     else:
         # Default to current directory
         cwd = Path.cwd()
         if not is_git_repo(cwd):
-            err_console.print("[yellow]Warning: Current directory does not appear to be a git repository[/yellow]")
+            err_console.print(
+                "[yellow]Warning: Current directory does not appear to be a git repository[/yellow]"
+            )
         repos_to_scan = [cwd]
 
     # Perform scan
@@ -231,7 +234,9 @@ def scan(
 
     # Check strict mode
     if strict:
-        min_required = min_score if min_score is not None else audit_config.minimum_passing_score
+        min_required = (
+            min_score if min_score is not None else audit_config.minimum_passing_score
+        )
         failing_repos = [r for r in summary.repos if r.score_total < min_required]
         if failing_repos:
             err_console.print(
@@ -281,7 +286,7 @@ def report(
         summary = ScanSummary.model_validate(data)
     except Exception as e:
         err_console.print(f"[red]Error loading JSON: {e}[/red]")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from None
 
     # Render report
     if format == ReportFormat.TABLE:

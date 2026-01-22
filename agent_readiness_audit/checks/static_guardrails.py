@@ -51,7 +51,7 @@ JS_FORMATTER_CONFIGS = [
     "biome.json",
 ]
 RUST_FORMATTER_CONFIGS = ["rustfmt.toml", ".rustfmt.toml"]
-GO_FORMATTER_CONFIGS = []  # gofmt is built-in
+GO_FORMATTER_CONFIGS: list[str] = []  # gofmt is built-in
 
 ALL_FORMATTER_CONFIGS = (
     PYTHON_FORMATTER_CONFIGS + JS_FORMATTER_CONFIGS + RUST_FORMATTER_CONFIGS
@@ -84,21 +84,23 @@ def check_linter_config_present(repo_path: Path) -> CheckResult:
 
     # Check pyproject.toml for linter config
     pyproject = repo_path / "pyproject.toml"
-    if pyproject.exists():
-        if file_contains(pyproject, "[tool.ruff", "[tool.flake8", "[tool.pylint"):
-            return CheckResult(
-                passed=True,
-                evidence="Found linter configuration in pyproject.toml",
-            )
+    if pyproject.exists() and file_contains(
+        pyproject, "[tool.ruff", "[tool.flake8", "[tool.pylint"
+    ):
+        return CheckResult(
+            passed=True,
+            evidence="Found linter configuration in pyproject.toml",
+        )
 
     # Check package.json for eslint
     package_json = repo_path / "package.json"
-    if package_json.exists():
-        if file_contains(package_json, '"eslint"', '"eslintConfig"', '"biome"'):
-            return CheckResult(
-                passed=True,
-                evidence="Found linter configuration in package.json",
-            )
+    if package_json.exists() and file_contains(
+        package_json, '"eslint"', '"eslintConfig"', '"biome"'
+    ):
+        return CheckResult(
+            passed=True,
+            evidence="Found linter configuration in package.json",
+        )
 
     return CheckResult(
         passed=False,
@@ -124,28 +126,26 @@ def check_formatter_config_present(repo_path: Path) -> CheckResult:
 
     # Check pyproject.toml for formatter config
     pyproject = repo_path / "pyproject.toml"
-    if pyproject.exists():
-        if file_contains(
-            pyproject,
-            "[tool.ruff.format",
-            "[tool.black",
-            "[tool.yapf",
-            "[tool.isort",
-            "line-length",
-        ):
-            return CheckResult(
-                passed=True,
-                evidence="Found formatter configuration in pyproject.toml",
-            )
+    if pyproject.exists() and file_contains(
+        pyproject,
+        "[tool.ruff.format",
+        "[tool.black",
+        "[tool.yapf",
+        "[tool.isort",
+        "line-length",
+    ):
+        return CheckResult(
+            passed=True,
+            evidence="Found formatter configuration in pyproject.toml",
+        )
 
     # Check package.json for prettier
     package_json = repo_path / "package.json"
-    if package_json.exists():
-        if file_contains(package_json, '"prettier"', '"biome"'):
-            return CheckResult(
-                passed=True,
-                evidence="Found formatter configuration in package.json",
-            )
+    if package_json.exists() and file_contains(package_json, '"prettier"', '"biome"'):
+        return CheckResult(
+            passed=True,
+            evidence="Found formatter configuration in package.json",
+        )
 
     # Check .editorconfig as basic formatting
     editorconfig = repo_path / ".editorconfig"
@@ -187,21 +187,19 @@ def check_typecheck_config_present(repo_path: Path) -> CheckResult:
 
     # Check pyproject.toml for mypy config
     pyproject = repo_path / "pyproject.toml"
-    if pyproject.exists():
-        if file_contains(pyproject, "[tool.mypy", "[tool.pyright"):
-            return CheckResult(
-                passed=True,
-                evidence="Found type checker configuration in pyproject.toml",
-            )
+    if pyproject.exists() and file_contains(pyproject, "[tool.mypy", "[tool.pyright"):
+        return CheckResult(
+            passed=True,
+            evidence="Found type checker configuration in pyproject.toml",
+        )
 
     # Check setup.cfg for mypy
     setup_cfg = repo_path / "setup.cfg"
-    if setup_cfg.exists():
-        if file_contains(setup_cfg, "[mypy"):
-            return CheckResult(
-                passed=True,
-                evidence="Found mypy configuration in setup.cfg",
-            )
+    if setup_cfg.exists() and file_contains(setup_cfg, "[mypy"):
+        return CheckResult(
+            passed=True,
+            evidence="Found mypy configuration in setup.cfg",
+        )
 
     # Rust has built-in type checking
     cargo_toml = repo_path / "Cargo.toml"

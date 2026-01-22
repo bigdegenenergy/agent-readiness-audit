@@ -5,16 +5,13 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import pytest
-
-from agent_readiness_audit.config import load_config
-from agent_readiness_audit.models import AuditConfig, ScanSummary
+from agent_readiness_audit.models import AuditConfig
 from agent_readiness_audit.reporting import (
     render_json_report,
     render_markdown_report,
     write_artifacts,
 )
-from agent_readiness_audit.scanner import scan_repo, scan_repos
+from agent_readiness_audit.scanner import scan_repos
 
 
 class TestJSONReport:

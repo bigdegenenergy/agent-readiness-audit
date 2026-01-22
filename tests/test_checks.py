@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
 from agent_readiness_audit.checks import (
     check_ci_runs_tests_or_lint,
     check_ci_workflow_present,

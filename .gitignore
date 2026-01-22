@@ -178,6 +178,8 @@ $RECYCLE.BIN/
 # Project specific
 *.json
 !tests/fixtures/**/*.json
+!.claude/settings.json
+# Note: .claude/settings.local.json should remain ignored (machine-specific config)
 *.md
 !README.md
 !CHANGELOG.md
@@ -185,7 +187,25 @@ $RECYCLE.BIN/
 !CODE_OF_CONDUCT.md
 !SECURITY.md
 !AGENTS.md
+!CLAUDE.md
+!REVIEW_INSTRUCTIONS.md
 !docs/**/*.md
+!.claude/**/*.md
 out/
 output/
 reports/
+
+# AI Dev Toolkit local configuration
+# These files contain LOCAL-ONLY data and should never be committed:
+
+# User's notification webhook URLs (contains personal service tokens)
+.claude/notifications.json
+
+# Generated analysis artifacts (temporary files)
+.claude/artifacts/
+
+# Local performance metrics (machine-specific)
+.claude/metrics/
+
+# Backup files created during hook installation
+*.backup.*

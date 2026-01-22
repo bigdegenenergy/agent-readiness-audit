@@ -74,21 +74,19 @@ def check_tests_directory_or_config_exists(repo_path: Path) -> CheckResult:
 
     # Check pyproject.toml for pytest config
     pyproject = repo_path / "pyproject.toml"
-    if pyproject.exists():
-        if file_contains(pyproject, "[tool.pytest", "testpaths"):
-            return CheckResult(
-                passed=True,
-                evidence="Found pytest configuration in pyproject.toml",
-            )
+    if pyproject.exists() and file_contains(pyproject, "[tool.pytest", "testpaths"):
+        return CheckResult(
+            passed=True,
+            evidence="Found pytest configuration in pyproject.toml",
+        )
 
     # Check package.json for test script
     package_json = repo_path / "package.json"
-    if package_json.exists():
-        if file_contains(package_json, '"test"'):
-            return CheckResult(
-                passed=True,
-                evidence="Found test script in package.json",
-            )
+    if package_json.exists() and file_contains(package_json, '"test"'):
+        return CheckResult(
+            passed=True,
+            evidence="Found test script in package.json",
+        )
 
     return CheckResult(
         passed=False,
@@ -106,30 +104,27 @@ def check_test_command_detectable(repo_path: Path) -> CheckResult:
     """Check if test command is detectable."""
     # Check package.json test script
     package_json = repo_path / "package.json"
-    if package_json.exists():
-        if file_contains(package_json, '"test"'):
-            return CheckResult(
-                passed=True,
-                evidence="Test command detectable via 'npm test' or 'yarn test'",
-            )
+    if package_json.exists() and file_contains(package_json, '"test"'):
+        return CheckResult(
+            passed=True,
+            evidence="Test command detectable via 'npm test' or 'yarn test'",
+        )
 
     # Check Makefile for test target
     makefile = file_exists(repo_path, "Makefile", "makefile", "GNUmakefile")
-    if makefile:
-        if file_contains(makefile, "test:", "tests:"):
-            return CheckResult(
-                passed=True,
-                evidence="Test command detectable via 'make test'",
-            )
+    if makefile and file_contains(makefile, "test:", "tests:"):
+        return CheckResult(
+            passed=True,
+            evidence="Test command detectable via 'make test'",
+        )
 
     # Check for pytest configuration
     pyproject = repo_path / "pyproject.toml"
-    if pyproject.exists():
-        if file_contains(pyproject, "[tool.pytest"):
-            return CheckResult(
-                passed=True,
-                evidence="Test command detectable via 'pytest' (configured in pyproject.toml)",
-            )
+    if pyproject.exists() and file_contains(pyproject, "[tool.pytest"):
+        return CheckResult(
+            passed=True,
+            evidence="Test command detectable via 'pytest' (configured in pyproject.toml)",
+        )
 
     pytest_ini = repo_path / "pytest.ini"
     if pytest_ini.exists():
@@ -178,49 +173,44 @@ def check_test_command_has_timeout(repo_path: Path) -> CheckResult:
     """Check if tests have timeout configuration."""
     # Check pytest configuration for timeout
     pyproject = repo_path / "pyproject.toml"
-    if pyproject.exists():
-        if file_contains(pyproject, "timeout", "pytest-timeout"):
-            return CheckResult(
-                passed=True,
-                evidence="Found timeout configuration in pyproject.toml",
-            )
+    if pyproject.exists() and file_contains(pyproject, "timeout", "pytest-timeout"):
+        return CheckResult(
+            passed=True,
+            evidence="Found timeout configuration in pyproject.toml",
+        )
 
     pytest_ini = repo_path / "pytest.ini"
-    if pytest_ini.exists():
-        if file_contains(pytest_ini, "timeout"):
-            return CheckResult(
-                passed=True,
-                evidence="Found timeout configuration in pytest.ini",
-            )
+    if pytest_ini.exists() and file_contains(pytest_ini, "timeout"):
+        return CheckResult(
+            passed=True,
+            evidence="Found timeout configuration in pytest.ini",
+        )
 
     # Check for pytest-timeout in dependencies
     requirements = file_exists(repo_path, "requirements.txt", "requirements-dev.txt")
-    if requirements:
-        if file_contains(requirements, "pytest-timeout"):
-            return CheckResult(
-                passed=True,
-                evidence="Found pytest-timeout in requirements",
-            )
+    if requirements and file_contains(requirements, "pytest-timeout"):
+        return CheckResult(
+            passed=True,
+            evidence="Found pytest-timeout in requirements",
+        )
 
     # Check package.json for jest timeout
     package_json = repo_path / "package.json"
-    if package_json.exists():
-        if file_contains(package_json, "testTimeout", "timeout"):
-            return CheckResult(
-                passed=True,
-                evidence="Found timeout configuration in package.json",
-            )
+    if package_json.exists() and file_contains(package_json, "testTimeout", "timeout"):
+        return CheckResult(
+            passed=True,
+            evidence="Found timeout configuration in package.json",
+        )
 
     # Check jest config
     jest_configs = ["jest.config.js", "jest.config.ts", "jest.config.mjs"]
     for config_name in jest_configs:
         config = repo_path / config_name
-        if config.exists():
-            if file_contains(config, "testTimeout", "timeout"):
-                return CheckResult(
-                    passed=True,
-                    evidence=f"Found timeout configuration in {config_name}",
-                )
+        if config.exists() and file_contains(config, "testTimeout", "timeout"):
+            return CheckResult(
+                passed=True,
+                evidence=f"Found timeout configuration in {config_name}",
+            )
 
     # This is a softer requirement - pass with suggestion if tests exist
     test_dir = dir_exists(repo_path, *TEST_DIRECTORIES)
