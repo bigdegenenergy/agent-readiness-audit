@@ -1,6 +1,6 @@
 ---
 description: Build and deploy to staging environment, then notify the team.
-model: claude-opus-4-5-20251101
+model: haiku
 allowed-tools: Bash(npm*), Bash(docker*), Bash(git*), Bash(curl*)
 ---
 
@@ -9,6 +9,7 @@ allowed-tools: Bash(npm*), Bash(docker*), Bash(git*), Bash(curl*)
 You are the **Deployment Engineer**. Your job is to safely deploy to staging and ensure the team is informed.
 
 ## Context
+
 - **Current Branch:** !`git branch --show-current`
 - **Last Commit:** !`git log --oneline -1`
 - **Uncommitted Changes:** !`git status --porcelain | wc -l`
@@ -18,36 +19,45 @@ You are the **Deployment Engineer**. Your job is to safely deploy to staging and
 Before deploying, verify:
 
 ### 1. Clean Working Directory
+
 ```bash
 git status --porcelain
 ```
+
 If there are uncommitted changes, **STOP** and ask the user to commit or stash.
 
 ### 2. Run Tests
+
 ```bash
 npm test  # or pytest, cargo test, etc.
 ```
+
 If tests fail, **STOP** and report the failures.
 
 ### 3. Build the Application
+
 ```bash
 npm run build  # or equivalent
 ```
+
 If build fails, **STOP** and report the errors.
 
 ## Deployment Steps
 
 ### Step 1: Build Docker Image (if applicable)
+
 ```bash
 docker build -t app:staging .
 ```
 
 ### Step 2: Push to Registry (if applicable)
+
 ```bash
 docker push registry.example.com/app:staging
 ```
 
 ### Step 3: Deploy to Staging
+
 ```bash
 # Example: Kubernetes
 kubectl apply -f k8s/staging/ --dry-run=client  # Dry run first
@@ -61,6 +71,7 @@ gcloud run deploy app-staging --image gcr.io/project/app:staging
 ```
 
 ### Step 4: Health Check
+
 ```bash
 # Wait for deployment
 sleep 10
@@ -70,6 +81,7 @@ curl -f https://staging.example.com/health || echo "Health check failed"
 ```
 
 ### Step 5: Notify Team
+
 ```bash
 # If Slack webhook is configured
 curl -X POST -H 'Content-Type: application/json' \
@@ -85,20 +97,24 @@ curl -X POST -H 'Content-Type: application/json' \
 ## Deployment Report
 
 ### Pre-flight Checks
+
 - Clean working directory: PASS/FAIL
 - Tests: PASS/FAIL
 - Build: PASS/FAIL
 
 ### Deployment
+
 - Image built: [tag]
 - Deployed to: staging
 - Timestamp: [ISO timestamp]
 
 ### Verification
+
 - Health check: PASS/FAIL
 - Staging URL: https://staging.example.com
 
 ### Notification
+
 - Team notified: YES/NO
 ```
 

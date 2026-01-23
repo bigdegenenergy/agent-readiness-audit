@@ -16,12 +16,12 @@ Configuration:
 import argparse
 import json
 import os
-import smtplib
 import sys
-import urllib.error
 import urllib.request
-from email.mime.multipart import MIMEMultipart
+import urllib.error
+import smtplib
 from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from pathlib import Path
 
 
@@ -72,22 +72,15 @@ def send_slack(config, title, message, level):
     if not webhook_url:
         return False
 
-    color = {
-        "error": "#FF0000",
-        "warning": "#FFA500",
-        "success": "#00FF00",
-        "info": "#0000FF",
-    }.get(level, "#808080")
+    color = {"error": "#FF0000", "warning": "#FFA500", "success": "#00FF00", "info": "#0000FF"}.get(level, "#808080")
 
     payload = {
-        "attachments": [
-            {
-                "color": color,
-                "title": title,
-                "text": message,
-                "footer": "Claude Code Notifications",
-            }
-        ]
+        "attachments": [{
+            "color": color,
+            "title": title,
+            "text": message,
+            "footer": "Claude Code Notifications",
+        }]
     }
 
     return _send_json_request(webhook_url, payload)
@@ -101,9 +94,7 @@ def send_telegram(config, title, message, level):
     if not bot_token or not chat_id:
         return False
 
-    emoji = {"error": "🔴", "warning": "🟡", "success": "🟢", "info": "🔵"}.get(
-        level, "⚪"
-    )
+    emoji = {"error": "🔴", "warning": "🟡", "success": "🟢", "info": "🔵"}.get(level, "⚪")
 
     text = f"{emoji} *{title}*\n\n{message}"
 
@@ -123,22 +114,15 @@ def send_discord(config, title, message, level):
     if not webhook_url:
         return False
 
-    color = {
-        "error": 0xFF0000,
-        "warning": 0xFFA500,
-        "success": 0x00FF00,
-        "info": 0x0000FF,
-    }.get(level, 0x808080)
+    color = {"error": 0xFF0000, "warning": 0xFFA500, "success": 0x00FF00, "info": 0x0000FF}.get(level, 0x808080)
 
     payload = {
-        "embeds": [
-            {
-                "title": title,
-                "description": message,
-                "color": color,
-                "footer": {"text": "Claude Code Notifications"},
-            }
-        ]
+        "embeds": [{
+            "title": title,
+            "description": message,
+            "color": color,
+            "footer": {"text": "Claude Code Notifications"},
+        }]
     }
 
     return _send_json_request(webhook_url, payload)
@@ -155,15 +139,8 @@ def send_ntfy(config, title, message, level):
 
     url = f"{server.rstrip('/')}/{topic}"
 
-    priority = {"error": "5", "warning": "4", "success": "3", "info": "3"}.get(
-        level, "3"
-    )
-    tags = {
-        "error": "x",
-        "warning": "warning",
-        "success": "white_check_mark",
-        "info": "information_source",
-    }.get(level, "")
+    priority = {"error": "5", "warning": "4", "success": "3", "info": "3"}.get(level, "3")
+    tags = {"error": "x", "warning": "warning", "success": "white_check_mark", "info": "information_source"}.get(level, "")
 
     headers = {
         "Title": title,
@@ -175,9 +152,7 @@ def send_ntfy(config, title, message, level):
         headers["Authorization"] = f"Bearer {token}"
 
     try:
-        req = urllib.request.Request(
-            url, data=message.encode(), headers=headers, method="POST"
-        )
+        req = urllib.request.Request(url, data=message.encode(), headers=headers, method="POST")
         with urllib.request.urlopen(req, timeout=10) as response:
             return response.status == 200
     except Exception as e:
@@ -232,7 +207,10 @@ def _send_json_request(url, payload):
     try:
         data = json.dumps(payload).encode()
         req = urllib.request.Request(
-            url, data=data, headers={"Content-Type": "application/json"}, method="POST"
+            url,
+            data=data,
+            headers={"Content-Type": "application/json"},
+            method="POST"
         )
         with urllib.request.urlopen(req, timeout=10) as response:
             return response.status in [200, 201, 204]
@@ -242,26 +220,11 @@ def _send_json_request(url, payload):
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Send notifications to multiple platforms"
-    )
+    parser = argparse.ArgumentParser(description="Send notifications to multiple platforms")
     parser.add_argument("--message", "-m", required=True, help="Notification message")
-    parser.add_argument(
-        "--title", "-t", default="Claude Code Alert", help="Notification title"
-    )
-    parser.add_argument(
-        "--level",
-        "-l",
-        choices=["error", "warning", "success", "info"],
-        default="info",
-        help="Alert level",
-    )
-    parser.add_argument(
-        "--platform",
-        "-p",
-        action="append",
-        help="Specific platform(s) to notify (default: all configured)",
-    )
+    parser.add_argument("--title", "-t", default="Claude Code Alert", help="Notification title")
+    parser.add_argument("--level", "-l", choices=["error", "warning", "success", "info"], default="info", help="Alert level")
+    parser.add_argument("--platform", "-p", action="append", help="Specific platform(s) to notify (default: all configured)")
     args = parser.parse_args()
 
     config = load_config()
@@ -280,9 +243,7 @@ def main():
     results = {}
     for platform in platforms:
         if platform in senders and platform in config:
-            results[platform] = senders[platform](
-                config[platform], args.title, args.message, args.level
-            )
+            results[platform] = senders[platform](config[platform], args.title, args.message, args.level)
 
     # Print results
     sent_to = [p for p, success in results.items() if success]

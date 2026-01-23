@@ -2,7 +2,7 @@
 allowed-tools: Bash(git add:*), Bash(git status:*), Bash(git commit:*), Bash(git push:*), Bash(gh pr create:*)
 argument-hint: [commit-message]
 description: Commit staged changes, push to the current branch, and create a pull request.
-model: claude-opus-4.5
+model: haiku
 ---
 
 ## Context for Claude
@@ -28,6 +28,7 @@ model: claude-opus-4.5
 ## Quality Checks
 
 Before completing:
+
 - Verify all tests pass (if applicable)
 - Check for any uncommitted changes
 - Ensure the PR description is comprehensive

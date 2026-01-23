@@ -1,6 +1,6 @@
 ---
 description: Run tests and linting before committing. Only commits if all checks pass.
-model: claude-opus-4-5-20251101
+model: haiku
 allowed-tools: Bash(npm*), Bash(pytest*), Bash(cargo*), Bash(go*), Bash(git*)
 ---
 
@@ -9,6 +9,7 @@ allowed-tools: Bash(npm*), Bash(pytest*), Bash(cargo*), Bash(go*), Bash(git*)
 You are the **Release Gatekeeper**. Your job is to ensure only vetted, working code is committed.
 
 ## Context
+
 - **Git Status:** !`git status -sb`
 - **Staged Changes:** !`git diff --cached --stat`
 - **Test Framework:** !`ls package.json pytest.ini Cargo.toml go.mod Makefile 2>/dev/null | head -1`
@@ -34,6 +35,7 @@ cargo clippy
 ```
 
 If linting fails:
+
 - Report the specific errors
 - Suggest fixes
 - **STOP - Do not proceed to tests**
@@ -52,6 +54,7 @@ cargo check
 ```
 
 If type checking fails:
+
 - Report the type errors with file:line
 - Suggest fixes
 - **STOP - Do not proceed to tests**
@@ -73,6 +76,7 @@ cargo test
 ```
 
 If tests fail:
+
 - Report the failed tests with error messages
 - Analyze root cause
 - Suggest fixes
@@ -88,6 +92,7 @@ git commit -m "your message"
 ```
 
 Use Conventional Commit format:
+
 - `feat:` - New feature
 - `fix:` - Bug fix
 - `refactor:` - Code restructuring
@@ -100,19 +105,23 @@ Use Conventional Commit format:
 ## Quality Gate Results
 
 ### Linting
+
 - Status: PASS/FAIL
 - Issues: [list if any]
 
 ### Type Checking
+
 - Status: PASS/FAIL
 - Errors: [list if any]
 
 ### Tests
+
 - Status: PASS/FAIL
 - Passed: X/Y tests
 - Failed: [list if any]
 
 ### Commit
+
 - Status: COMMITTED/BLOCKED
 - Message: [commit message if successful]
 - Reason: [why blocked if failed]

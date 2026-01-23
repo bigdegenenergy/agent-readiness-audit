@@ -1,6 +1,6 @@
 ---
 description: Profile code and suggest performance optimizations. Identify bottlenecks and fix them.
-model: claude-opus-4-5-20251101
+model: haiku
 allowed-tools: Bash(*), Read(*), Edit(*), Glob(*), Grep(*)
 ---
 
@@ -9,6 +9,7 @@ allowed-tools: Bash(*), Read(*), Edit(*), Glob(*), Grep(*)
 You are the **Performance Engineer**. Find bottlenecks and optimize them.
 
 ## Context
+
 - **Project Type:** !`ls package.json pyproject.toml Cargo.toml go.mod 2>/dev/null | head -1`
 - **Recent Changes:** !`git diff --stat HEAD~5 2>/dev/null | tail -5`
 
@@ -36,6 +37,7 @@ cargo build --release --timings
 ### Step 2: Identify Bottlenecks
 
 Look for:
+
 - **Hot paths** - Code executed frequently
 - **Slow operations** - I/O, network, DB queries
 - **Memory issues** - Leaks, excessive allocations
@@ -44,6 +46,7 @@ Look for:
 ### Step 3: Analyze and Prioritize
 
 Rank by:
+
 1. **Impact** - How much time/memory saved?
 2. **Effort** - How hard to fix?
 3. **Risk** - Could it break something?
@@ -53,6 +56,7 @@ Focus on high-impact, low-effort fixes first.
 ### Step 4: Apply Optimizations
 
 Common fixes:
+
 - **Caching** - Memoize expensive computations
 - **Batching** - Combine multiple operations
 - **Lazy loading** - Defer until needed
@@ -76,6 +80,7 @@ node --max-old-space-size=4096 --expose-gc app.js
 ## Performance Optimization Report
 
 ### Current Metrics
+
 - Build time: X seconds
 - Test time: Y seconds
 - Bundle size: Z KB
@@ -101,6 +106,7 @@ node --max-old-space-size=4096 --expose-gc app.js
 2. [Consider for next sprint]
 
 ### Summary
+
 - Total improvement: X% faster / Y% smaller
 - Risk level: Low/Medium/High
 ```
@@ -108,6 +114,7 @@ node --max-old-space-size=4096 --expose-gc app.js
 ## Optimization Checklist
 
 ### Frontend
+
 - [ ] Bundle splitting/code splitting
 - [ ] Image optimization
 - [ ] Lazy loading components
@@ -115,6 +122,7 @@ node --max-old-space-size=4096 --expose-gc app.js
 - [ ] Virtual scrolling for lists
 
 ### Backend
+
 - [ ] Database query optimization (indexes, N+1)
 - [ ] Connection pooling
 - [ ] Response caching
@@ -122,6 +130,7 @@ node --max-old-space-size=4096 --expose-gc app.js
 - [ ] Pagination
 
 ### General
+
 - [ ] Remove unused dependencies
 - [ ] Upgrade to faster alternatives
 - [ ] Enable compression

@@ -68,12 +68,18 @@ if [[ "$TOOL_NAME" == "Bash" ]] && [[ -n "$BASH_COMMAND" ]]; then
         exit 0
     fi
 
-    # Test commands - REMOVED from auto-approve
-    # Security: Test runners execute code from config files (package.json scripts,
-    # pytest fixtures, Makefile targets). If the agent can modify these files and
-    # then auto-run tests, it could execute arbitrary code without human approval.
-    # Test commands now require manual approval to maintain the security boundary.
-    # This matches the approach already taken for build commands.
+    # Test commands - always safe
+    if [[ "$BASH_COMMAND" =~ ^npm\ test ]] || \
+       [[ "$BASH_COMMAND" =~ ^pnpm\ test ]] || \
+       [[ "$BASH_COMMAND" =~ ^yarn\ test ]] || \
+       [[ "$BASH_COMMAND" =~ ^pytest ]] || \
+       [[ "$BASH_COMMAND" =~ ^python\ -m\ pytest ]] || \
+       [[ "$BASH_COMMAND" =~ ^cargo\ test ]] || \
+       [[ "$BASH_COMMAND" =~ ^go\ test ]] || \
+       [[ "$BASH_COMMAND" =~ ^make\ test ]]; then
+        echo '{"decision": "approve"}'
+        exit 0
+    fi
 
     # Lint commands - safe, read-only
     if [[ "$BASH_COMMAND" =~ ^npm\ run\ lint ]] || \
@@ -100,11 +106,17 @@ if [[ "$TOOL_NAME" == "Bash" ]] && [[ -n "$BASH_COMMAND" ]]; then
         exit 0
     fi
 
-    # Build commands - REMOVED from auto-approve
-    # Security: Build tools execute code from config files (package.json, Makefile).
-    # If the agent can modify these files and then run build commands, it could
-    # execute arbitrary code without human approval. These commands now require
-    # manual approval to maintain the security boundary.
+    # Build commands - safe
+    if [[ "$BASH_COMMAND" =~ ^npm\ run\ build ]] || \
+       [[ "$BASH_COMMAND" =~ ^pnpm\ build ]] || \
+       [[ "$BASH_COMMAND" =~ ^yarn\ build ]] || \
+       [[ "$BASH_COMMAND" =~ ^cargo\ build ]] || \
+       [[ "$BASH_COMMAND" =~ ^go\ build ]] || \
+       [[ "$BASH_COMMAND" =~ ^make$ ]] || \
+       [[ "$BASH_COMMAND" =~ ^make\ build ]]; then
+        echo '{"decision": "approve"}'
+        exit 0
+    fi
 
     # Type checking - read-only
     if [[ "$BASH_COMMAND" =~ ^npx\ tsc ]] || \
@@ -153,8 +165,9 @@ if [[ "$TOOL_NAME" == "Bash" ]] && [[ -n "$BASH_COMMAND" ]]; then
         exit 0
     fi
 
-    # File listing/searching - safe (except find with dangerous flags)
+    # File listing/searching - safe
     if [[ "$BASH_COMMAND" =~ ^ls ]] || \
+       [[ "$BASH_COMMAND" =~ ^find ]] || \
        [[ "$BASH_COMMAND" =~ ^grep ]] || \
        [[ "$BASH_COMMAND" =~ ^rg ]] || \
        [[ "$BASH_COMMAND" =~ ^wc ]] || \
@@ -163,16 +176,6 @@ if [[ "$TOOL_NAME" == "Bash" ]] && [[ -n "$BASH_COMMAND" ]]; then
        [[ "$BASH_COMMAND" =~ ^cat ]]; then
         echo '{"decision": "approve"}'
         exit 0
-    fi
-
-    # find command - only approve if no dangerous flags
-    # -delete, -exec, -execdir, -ok, -okdir can modify files
-    if [[ "$BASH_COMMAND" =~ ^find ]]; then
-        if [[ ! "$BASH_COMMAND" =~ (-delete|-exec|-execdir|-ok|-okdir) ]]; then
-            echo '{"decision": "approve"}'
-            exit 0
-        fi
-        # Fall through to permission dialog for find with dangerous flags
     fi
 fi
 

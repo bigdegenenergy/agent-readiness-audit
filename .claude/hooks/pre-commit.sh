@@ -371,11 +371,21 @@ if [ -n "$CODE_FILES" ]; then
         EXIT_CODE=2
     fi
 
-    # Full names detection DISABLED - too many false positives
-    # The pattern [A-Z][a-z]+\s+[A-Z][a-z]+ matches normal prose like
-    # "Fix Bug", "Update Readme", "Add Feature" which blocks legitimate commits.
-    # Heuristic name detection is too noisy for a blocking pre-commit hook.
-    # Use manual review or a dedicated PII scanner with ML-based detection instead.
+    # Full names (First Last pattern - capitalized words that look like names)
+    # Look for patterns like "name: John Smith" or "author: Jane Doe" or "by John Smith"
+    NAME_CONTEXT='(name|author|user|contact|owner|created[_ ]?by|assigned[_ ]?to|submitted[_ ]?by)\s*[:=]?\s*'
+    NAME_PATTERN="[A-Z][a-z]+\s+[A-Z][a-z]+"
+    NAME_EXCLUDES='Hello World|Lorem Ipsum|Foo Bar|John Doe|Jane Doe|Test User|Example User|First Last|Your Name'
+    NAME_FOUND=$(echo "$CODE_FILES" | xargs grep -lE "${NAME_CONTEXT}${NAME_PATTERN}" 2>/dev/null | while read -r file; do
+        if grep -E "${NAME_CONTEXT}${NAME_PATTERN}" "$file" 2>/dev/null | grep -vE "$NAME_EXCLUDES" | grep -qE "${NAME_CONTEXT}${NAME_PATTERN}"; then
+            echo "$file"
+        fi
+    done | head -3)
+    if [ -n "$NAME_FOUND" ]; then
+        PII_ERRORS="${PII_ERRORS}  ⛔ Full names found in:\n"
+        PII_ERRORS="${PII_ERRORS}$(echo "$NAME_FOUND" | sed 's/^/     /')\n"
+        EXIT_CODE=2
+    fi
 fi
 
 if [ -n "$PII_ERRORS" ]; then
