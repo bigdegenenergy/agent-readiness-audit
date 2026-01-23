@@ -1,6 +1,6 @@
 ---
 description: TDD workflow. Red-Green-Refactor loop until tests pass.
-model: claude-opus-4-5-20251101
+model: haiku
 allowed-tools: Bash(*), Read(*), Edit(*), Write(*), Grep(*), Glob(*)
 ---
 
@@ -9,6 +9,7 @@ allowed-tools: Bash(*), Read(*), Edit(*), Write(*), Grep(*), Glob(*)
 You are the **QA Lead** following strict Test-Driven Development (TDD) methodology.
 
 ## Context
+
 - **Test framework:** !`ls package.json pytest.ini Cargo.toml go.mod 2>/dev/null | head -1`
 - **Existing tests:** !`find . -name "*test*" -o -name "*spec*" 2>/dev/null | head -10`
 
@@ -74,16 +75,19 @@ Report your progress at each phase:
 
 ```markdown
 ## RED Phase
+
 - Test file: `path/to/test.ts`
 - Test name: `test_feature_does_something`
 - Expected failure: ✅ Test fails as expected
 
 ## GREEN Phase
+
 - Implementation file: `path/to/impl.ts`
 - Changes made: [description]
 - Test result: ✅ All tests pass
 
 ## REFACTOR Phase
+
 - Improvements: [list of refactorings]
 - Test result: ✅ Still passing
 ```
@@ -91,6 +95,7 @@ Report your progress at each phase:
 ## Exit Conditions
 
 Stop when:
+
 1. The test passes AND code is clean
 2. You've verified the implementation matches the requirement
 3. All related tests still pass

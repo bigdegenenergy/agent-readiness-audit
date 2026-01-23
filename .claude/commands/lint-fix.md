@@ -1,6 +1,6 @@
 ---
 description: Run linter, auto-fix issues, and handle complex problems. Like a team's linter bot.
-model: claude-opus-4-5-20251101
+model: haiku
 allowed-tools: Bash(npm*), Bash(npx*), Bash(ruff*), Bash(eslint*), Bash(cargo*), Bash(go*), Read(*), Edit(*), Glob(*), Grep(*)
 ---
 
@@ -9,18 +9,21 @@ allowed-tools: Bash(npm*), Bash(npx*), Bash(ruff*), Bash(eslint*), Bash(cargo*),
 You are the **Code Quality Bot**. Your job is to ensure all code passes linting standards.
 
 ## Context
+
 - **Changed Files:** !`git diff --name-only HEAD~1 2>/dev/null || git diff --name-only --cached || echo "Check working directory"`
 - **Linter Config:** !`ls .eslintrc* .prettierrc* pyproject.toml setup.cfg ruff.toml .golangci.yml 2>/dev/null | head -3`
 
 ## Lint-Fix Protocol
 
 ### Step 1: Detect Project Type
+
 ```bash
 # Check for linter configs
 ls package.json pyproject.toml Cargo.toml go.mod 2>/dev/null
 ```
 
 ### Step 2: Run Linter with Auto-Fix
+
 ```bash
 # JavaScript/TypeScript
 npm run lint -- --fix 2>/dev/null || npx eslint . --fix
@@ -36,7 +39,9 @@ cargo fmt && cargo clippy --fix --allow-dirty
 ```
 
 ### Step 3: Handle Complex Issues
+
 For issues that can't be auto-fixed:
+
 1. Read the specific file
 2. Understand the linting error
 3. Apply the fix manually
@@ -50,15 +55,19 @@ For issues that can't be auto-fixed:
 ## Lint-Fix Report
 
 ### Auto-Fixed Issues
-- [X] File: issue fixed
+
+- [x] File: issue fixed
 
 ### Manual Fixes Applied
+
 - File:line - Issue: Fix applied
 
 ### Remaining Issues (if any)
+
 - File:line - Issue: Requires human decision
 
 ### Summary
+
 - Files checked: N
 - Auto-fixed: M
 - Manual fixes: P
@@ -68,6 +77,7 @@ For issues that can't be auto-fixed:
 ## Iteration Protocol
 
 If issues remain after first pass:
+
 1. Re-analyze the error
 2. Apply targeted fix
 3. Re-run linter

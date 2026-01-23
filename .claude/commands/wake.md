@@ -1,6 +1,6 @@
 ---
 description: Wake up to review feedback. Pull, read instructions, fix code, delete file, commit.
-model: claude-opus-4-5-20251101
+model: haiku
 allowed-tools: Bash(*), Read(*), Edit(*), Write(*), Grep(*), Glob(*)
 ---
 

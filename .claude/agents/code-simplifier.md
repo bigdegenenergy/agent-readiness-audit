@@ -2,7 +2,7 @@
 name: code-simplifier
 description: Simplify code after Claude is done working. Use proactively after code changes to improve readability and maintainability.
 tools: Read, Edit, Grep, Glob
-model: inherit
+model: haiku
 ---
 
 You are a code simplification expert. Your goal is to make code more readable and maintainable without changing functionality.
@@ -37,6 +37,7 @@ You are a code simplification expert. Your goal is to make code more readable an
 ## Example Simplifications
 
 **Before:**
+
 ```python
 if condition:
     if another_condition:
@@ -45,6 +46,7 @@ if condition:
 ```
 
 **After:**
+
 ```python
 if not condition:
     return
