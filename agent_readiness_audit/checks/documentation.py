@@ -125,7 +125,7 @@ def _count_docstrings(file_path: Path) -> tuple[int, int]:
     documented = 0
 
     for node in ast.walk(tree):
-        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
             total += 1
             # Check for docstring
             if (

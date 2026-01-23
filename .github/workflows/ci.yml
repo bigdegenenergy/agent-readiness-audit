@@ -27,6 +27,9 @@ jobs:
       - name: Run ruff linter
         run: ruff check .
 
+      - name: Run ruff linter on .claude/hooks
+        run: ruff check .claude/hooks
+
       - name: Run ruff formatter check
         run: ruff format --check .
 
