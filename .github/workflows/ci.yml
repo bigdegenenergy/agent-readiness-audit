@@ -27,6 +27,9 @@ jobs:
       - name: Run ruff linter
         run: ruff check .
 
+      - name: Run ruff linter on .claude/hooks
+        run: ruff check .claude/hooks
+
       - name: Run ruff formatter check
         run: ruff format --check .
 
@@ -80,19 +83,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Install dependencies
-        run: |
-          pip install ruff==0.8.6
-
-      - name: Lint Python files with Ruff
-        run: |
-          ruff check .
-
       - name: Lint Markdown files
         uses: DavidAnson/markdownlint-cli2-action@v14
         with:
@@ -103,11 +93,6 @@ jobs:
         uses: ludeeus/action-shellcheck@master
         with:
           scandir: '.claude/hooks'
-        continue-on-error: true
-
-      - name: Lint Python hooks
-        run: |
-          ruff check .claude/hooks
         continue-on-error: true
 
   validate-config:
