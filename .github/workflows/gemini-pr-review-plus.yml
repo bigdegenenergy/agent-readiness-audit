@@ -455,8 +455,8 @@ jobs:
           python3 << 'PY'
           import os, json, urllib.request, html
 
-          bot = os.environ["TELEGRAM_BOT_TOKEN"]
-          chat = os.environ["TELEGRAM_CHAT_ID"]
+          bot = os.environ["TELEGRAM_BOT_TOKEN"].strip()
+          chat = os.environ["TELEGRAM_CHAT_ID"].strip()
           pr_number = os.environ.get("PR_NUMBER", "?")
           pr_title = html.escape(os.environ.get("PR_TITLE", "Unknown"))
           pr_url = os.environ.get("PR_URL", "")
