@@ -46,7 +46,7 @@ def _count_typed_functions(file_path: Path) -> tuple[int, int]:
     typed = 0
 
     for node in ast.walk(tree):
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
             total += 1
             has_type = False
 
