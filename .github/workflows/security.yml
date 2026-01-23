@@ -52,7 +52,7 @@ jobs:
       - name: ShellCheck Security Analysis
         run: |
           sudo apt-get install -y shellcheck
-          find .claude/hooks -name "*.sh" -exec shellcheck -S warning {} \; || true
+          find .claude/hooks -name "*.sh" -exec shellcheck -S warning {} \;
 
       - name: Check for dangerous patterns
         run: |
@@ -93,7 +93,7 @@ jobs:
 
       - name: Run Bandit Security Scan
         run: |
-          find .claude/hooks -name "*.py" -exec bandit -ll {} \; || true
+          find .claude/hooks -name "*.py" -exec bandit -ll {} \;
 
   dependency-review:
     name: Dependency Review
