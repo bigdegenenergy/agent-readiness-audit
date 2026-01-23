@@ -6,13 +6,13 @@ This module provides common validation functions used across hooks to ensure
 consistent input validation and error handling.
 """
 
-import re
 import os
+import re
 import shlex
-from typing import Optional, Dict, Any, List
+from typing import Any
 
 
-def validate_file_path(file_path: Optional[str]) -> bool:
+def validate_file_path(file_path: str | None) -> bool:
     """
     Validate that a file path is safe and within expected bounds.
 
@@ -34,13 +34,10 @@ def validate_file_path(file_path: Optional[str]) -> bool:
         return False
 
     # Ensure path is not too long
-    if len(file_path) > 4096:
-        return False
-
-    return True
+    return len(file_path) <= 4096
 
 
-def validate_json_input(data: Any) -> Dict[str, Any]:
+def validate_json_input(data: Any) -> dict[str, Any]:
     """
     Validate and normalize JSON input from Claude's tool input.
 
@@ -59,7 +56,7 @@ def validate_json_input(data: Any) -> Dict[str, Any]:
     return data
 
 
-def is_safe_command(command: str, allowed_patterns: List[str]) -> bool:
+def is_safe_command(command: str, allowed_patterns: list[str]) -> bool:
     """
     Check if a command matches allowed patterns.
 
@@ -81,14 +78,10 @@ def is_safe_command(command: str, allowed_patterns: List[str]) -> bool:
     if not command or not isinstance(command, str):
         return False
 
-    for pattern in allowed_patterns:
-        if re.match(pattern, command):
-            return True
-
-    return False
+    return any(re.match(pattern, command) for pattern in allowed_patterns)
 
 
-def validate_environment() -> Dict[str, bool]:
+def validate_environment() -> dict[str, bool]:
     """
     Check if required environment variables and tools are available.
 
