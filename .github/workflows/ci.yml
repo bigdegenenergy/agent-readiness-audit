@@ -80,6 +80,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install ruff
+
+      - name: Lint Python files with Ruff
+        run: |
+          ruff check .
+
       - name: Lint Markdown files
         uses: DavidAnson/markdownlint-cli2-action@v14
         with:
@@ -95,13 +108,12 @@ jobs:
       - name: Lint Python hooks
         uses: py-actions/flake8@v2
         with:
-          path: ".claude/hooks"
+          path: '.claude/hooks'
         continue-on-error: true
 
   validate-config:
     name: Validate Configuration
     runs-on: ubuntu-latest
-    # Skip commits from github-actions[bot] to prevent infinite loops
     if: github.actor != 'github-actions[bot]'
     steps:
       - uses: actions/checkout@v4
@@ -150,7 +162,6 @@ jobs:
   hooks-executable:
     name: Verify Hooks Executable
     runs-on: ubuntu-latest
-    # Skip commits from github-actions[bot] to prevent infinite loops
     if: github.actor != 'github-actions[bot]'
     steps:
       - uses: actions/checkout@v4
@@ -170,7 +181,6 @@ jobs:
   docs-check:
     name: Documentation Check
     runs-on: ubuntu-latest
-    # Skip commits from github-actions[bot] to prevent infinite loops
     if: github.actor != 'github-actions[bot]'
     steps:
       - uses: actions/checkout@v4
