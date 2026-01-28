@@ -9,7 +9,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TypeAlias
 
-from agent_readiness_audit.models import PILLAR_TO_CATEGORY, CheckStatus
+from agent_readiness_audit.models import (
+    CATEGORY_TO_DOMAIN,
+    PILLAR_TO_CATEGORY,
+    PILLAR_TO_DOMAIN,
+    CheckStatus,
+)
 from agent_readiness_audit.models import CheckResult as ModelCheckResult
 
 # Configure logger for audit warnings
@@ -73,6 +78,7 @@ class CheckDefinition:
     enabled: bool = True
     pillar: str = ""  # v2: which pillar this check belongs to
     gate_level: int | None = None  # v2: if set, this is a gate for that level
+    domain: str = ""  # v3: which domain this check belongs to
 
 
 CheckFunc: TypeAlias = Callable[[Path], CheckResult]
@@ -85,6 +91,7 @@ def check(
     weight: float = 1.0,
     pillar: str = "",
     gate_level: int | None = None,
+    domain: str = "",
 ) -> Callable[[CheckFunc], CheckFunc]:
     """Decorator to register a check function.
 
@@ -96,6 +103,8 @@ def check(
         pillar: v2 pillar this check belongs to. If not provided,
                 derived from category mapping.
         gate_level: If set, this check is a gate for that maturity level.
+        domain: v3 domain this check belongs to. If not provided,
+                derived from pillar or category mapping.
 
     Returns:
         Decorator function.
@@ -103,6 +112,7 @@ def check(
     # Derive category from pillar if pillar provided but no category
     effective_category = category
     effective_pillar = pillar
+    effective_domain = domain
 
     # If pillar not provided, try to infer from category
     if not effective_pillar and effective_category:
@@ -113,6 +123,13 @@ def check(
     if effective_pillar and not effective_category:
         effective_category = PILLAR_TO_CATEGORY.get(effective_pillar, effective_pillar)
 
+    # Derive domain from pillar or category if not provided (v3)
+    if not effective_domain:
+        if effective_pillar and effective_pillar in PILLAR_TO_DOMAIN:
+            effective_domain = PILLAR_TO_DOMAIN[effective_pillar]
+        elif effective_category and effective_category in CATEGORY_TO_DOMAIN:
+            effective_domain = CATEGORY_TO_DOMAIN[effective_category]
+
     def decorator(func: CheckFunc) -> CheckFunc:
         _CHECK_REGISTRY[name] = CheckDefinition(
             name=name,
@@ -122,6 +139,7 @@ def check(
             weight=weight,
             pillar=effective_pillar,
             gate_level=gate_level,
+            domain=effective_domain,
         )
         return func
 
@@ -159,6 +177,18 @@ def get_checks_by_pillar(pillar: str) -> list[CheckDefinition]:
         List of check definitions for the pillar.
     """
     return [c for c in _CHECK_REGISTRY.values() if c.pillar == pillar]
+
+
+def get_checks_by_domain(domain: str) -> list[CheckDefinition]:
+    """Get all checks for a specific domain (v3).
+
+    Args:
+        domain: Domain name to filter by.
+
+    Returns:
+        List of check definitions for the domain.
+    """
+    return [c for c in _CHECK_REGISTRY.values() if c.domain == domain]
 
 
 def get_gate_checks(level: int) -> list[CheckDefinition]:

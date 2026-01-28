@@ -9,14 +9,23 @@ from agent_readiness_audit.checks.base import (
     run_check,
 )
 from agent_readiness_audit.models import (
+    CATEGORY_TO_DOMAIN,
+    DOMAIN_DESCRIPTIONS,
+    DOMAIN_WEIGHTS,
     GATE_CHECKS,
+    PILLAR_TO_DOMAIN,
     AuditConfig,
     CategoryScore,
+    DomainScore,
     GateStatus,
     PillarScore,
     RepoResult,
     ScanSummary,
+    calculate_domain_score,
     calculate_maturity_with_gates,
+    calculate_overall_score,
+    get_grade_description,
+    get_grade_for_score,
     get_level_for_score,
     get_maturity_for_score,
     get_maturity_name,
@@ -63,6 +72,16 @@ PILLAR_ORDER = [
     "eval_frameworks",
     "golden_datasets",
     "distribution_dx",
+]
+
+# v3: Domain order for consistent output (per ARA specification)
+DOMAIN_ORDER = [
+    "structure",  # Structure & Discoverability (15%)
+    "interfaces",  # Interfaces & Contracts (20%)
+    "determinism",  # Determinism & Side Effects (20%)
+    "security",  # Security & Blast Radius (20%)
+    "testing",  # Testing & Validation (15%)
+    "ergonomics",  # Agent Ergonomics (10%)
 ]
 
 # Fix-first priority mapping
@@ -171,6 +190,18 @@ def scan_repo(repo_path: Path, config: AuditConfig) -> RepoResult:
             max_points=2.0,  # All pillars have max 2 points for now
         )
 
+    # Initialize domain scores (v3)
+    for domain in DOMAIN_ORDER:
+        domain_config = config.domains.get(domain)
+        if domain_config and not domain_config.enabled:
+            continue
+
+        result.domain_scores[domain] = DomainScore(
+            name=domain,
+            description=DOMAIN_DESCRIPTIONS.get(domain, ""),
+            weight=DOMAIN_WEIGHTS.get(domain, 0.0),
+        )
+
     # Track check results by name for gate evaluation
     check_results: dict[str, bool] = {}
 
@@ -215,6 +246,28 @@ def scan_repo(repo_path: Path, config: AuditConfig) -> RepoResult:
             if check_result.passed:
                 result.pillar_scores[pillar_name].passed_checks += 1
 
+        # Add to domain (v3) - use check's domain or fallback to mapping
+        domain_name = check_def.domain
+        if not domain_name and pillar_name and pillar_name in PILLAR_TO_DOMAIN:
+            domain_name = PILLAR_TO_DOMAIN[pillar_name]
+        elif not domain_name and check_def.category in CATEGORY_TO_DOMAIN:
+            domain_name = CATEGORY_TO_DOMAIN[check_def.category]
+
+        if domain_name and domain_name in result.domain_scores:
+            result.domain_scores[domain_name].checks.append(check_result)
+            result.domain_scores[domain_name].total_checks += 1
+            if check_result.passed:
+                result.domain_scores[domain_name].passed_checks += 1
+                if check_result.evidence:
+                    result.domain_scores[domain_name].evidence.append(
+                        check_result.evidence
+                    )
+            else:
+                if check_result.suggestion:
+                    result.domain_scores[domain_name].red_flags.append(
+                        check_result.suggestion
+                    )
+
     # Calculate category scores
     for _category, cat_score in result.category_scores.items():
         if cat_score.total_checks > 0:
@@ -245,8 +298,24 @@ def scan_repo(repo_path: Path, config: AuditConfig) -> RepoResult:
     )
     result.maturity_name = get_maturity_name(result.maturity_level)
 
+    # Calculate domain scores (v3)
+    for _domain_name, domain_score in result.domain_scores.items():
+        domain_score.score = calculate_domain_score(
+            domain_score.passed_checks, domain_score.total_checks
+        )
+
+    # Calculate overall weighted score (v3)
+    result.overall_score = calculate_overall_score(result.domain_scores)
+
+    # Determine grade (v3)
+    result.grade = get_grade_for_score(result.overall_score)
+    result.grade_description = get_grade_description(result.grade)
+
     # Generate fix-first recommendations
     result.fix_first = generate_fix_first(result)
+
+    # Generate remediation items (v3) - ordered by domain weight (highest first)
+    result.remediation_items = generate_remediation(result)
 
     return result
 
@@ -325,6 +394,40 @@ def generate_fix_first(result: RepoResult) -> list[str]:
                         recommendations.append(check.suggestion)
 
     return recommendations[:7]  # Limit to top 7 recommendations
+
+
+def generate_remediation(result: RepoResult) -> list[str]:
+    """Generate remediation items ordered by domain weight (v3).
+
+    Higher-weighted domains are prioritized because fixing them
+    has more impact on the overall score.
+
+    Args:
+        result: Repository audit result.
+
+    Returns:
+        Ordered list of remediation items.
+    """
+    remediation: list[str] = []
+
+    # Sort domains by weight (highest first)
+    sorted_domains = sorted(
+        result.domain_scores.items(),
+        key=lambda x: x[1].weight,
+        reverse=True,
+    )
+
+    for _domain_name, domain_score in sorted_domains:
+        # Skip domains with perfect scores
+        if domain_score.score >= 100:
+            continue
+
+        # Add red flags (failed check suggestions) for this domain
+        for red_flag in domain_score.red_flags:
+            if red_flag not in remediation:
+                remediation.append(red_flag)
+
+    return remediation
 
 
 def scan_repos(

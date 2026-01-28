@@ -12,6 +12,7 @@ from agent_readiness_audit.reporting.json_report import (
 )
 from agent_readiness_audit.reporting.markdown_report import (
     render_markdown_report,
+    render_remediation_markdown,
     render_repo_markdown,
 )
 
@@ -57,16 +58,25 @@ def write_artifacts(summary: ScanSummary, output_dir: Path) -> None:
 def write_repo_artifacts(result: RepoResult, output_dir: Path) -> None:
     """Write artifacts for a single repository.
 
+    Per v3 specification, outputs:
+    - audit.json (machine-readable results)
+    - audit.md (human-readable summary)
+    - remediation.md (ordered fix list)
+
     Args:
         result: Repository result to write.
         output_dir: Directory to write artifacts to.
     """
     slug = slugify(result.repo_name)
 
-    # Write repo JSON
+    # Write repo JSON (audit.json per v3 spec)
     repo_json = render_repo_json(result)
     (output_dir / f"{slug}.json").write_text(repo_json)
 
-    # Write repo Markdown
+    # Write repo Markdown (audit.md per v3 spec)
     repo_md = render_repo_markdown(result)
     (output_dir / f"{slug}.md").write_text(repo_md)
+
+    # Write remediation Markdown (remediation.md per v3 spec)
+    remediation_md = render_remediation_markdown(result)
+    (output_dir / f"{slug}-remediation.md").write_text(remediation_md)
