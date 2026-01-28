@@ -57,7 +57,7 @@ SECRET_PATTERNS = [
         r'(?i)(aws[_-]?access[_-]?key[_-]?id)\s*[=:]\s*["\'][A-Z0-9]{16,}["\']',
         "AWS key",
     ),
-    (r"sk-[a-zA-Z0-9]{32,}", "OpenAI API key"),
+    (r"sk-(proj-)?[a-zA-Z0-9_-]{20,}", "OpenAI API key"),
     (r"ghp_[a-zA-Z0-9]{36}", "GitHub personal access token"),
     (r"gho_[a-zA-Z0-9]{36}", "GitHub OAuth token"),
 ]

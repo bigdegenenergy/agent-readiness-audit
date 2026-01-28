@@ -311,12 +311,15 @@ def check_no_hidden_critical_logic(repo_path: Path) -> CheckResult:
     if len(notebooks) > 3:
         red_flags.append(f"Multiple notebooks ({len(notebooks)}) may contain logic")
 
-    # Check CI for complex logic
+    # Check CI for complex logic (only flag very large files that likely contain
+    # embedded scripts or significant business logic, not normal workflow configs)
     ci_files = glob_files(repo_path, ".github/workflows/*.yml")
     for ci_file in ci_files:
         content = read_file_safe(ci_file)
-        if content and len(content) > 5000:  # Large CI file
-            red_flags.append(f"Large CI file: {ci_file.name}")
+        # 15000 chars threshold (~300+ lines) to avoid false positives on
+        # standard multi-job workflows while catching embedded bash scripts
+        if content and len(content) > 15000:
+            red_flags.append(f"Very large CI file: {ci_file.name}")
 
     if red_flags:
         return CheckResult(
