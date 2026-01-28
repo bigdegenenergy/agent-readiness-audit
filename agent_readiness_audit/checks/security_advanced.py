@@ -22,7 +22,29 @@ from agent_readiness_audit.checks.base import (
 )
 
 
-def is_file_tracked_by_git(repo_path: Path, file_path: str) -> bool:
+def is_git_available(repo_path: Path) -> bool:
+    """Check if git is available and this is a git repository.
+
+    Args:
+        repo_path: Path to the repository root.
+
+    Returns:
+        True if git is available and repo is a git repo, False otherwise.
+    """
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--git-dir"],
+            cwd=repo_path,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        return result.returncode == 0
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+        return False
+
+
+def is_file_tracked_by_git(repo_path: Path, file_path: str) -> bool | None:
     """Check if a file is tracked by git (not just exists on disk).
 
     Args:
@@ -30,7 +52,8 @@ def is_file_tracked_by_git(repo_path: Path, file_path: str) -> bool:
         file_path: Relative path to the file.
 
     Returns:
-        True if the file is tracked by git, False otherwise.
+        True if the file is tracked by git, False if not tracked,
+        None if git is not available (allowing caller to handle appropriately).
     """
     try:
         result = subprocess.run(
@@ -42,9 +65,8 @@ def is_file_tracked_by_git(repo_path: Path, file_path: str) -> bool:
         )
         return result.returncode == 0
     except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
-        # If git isn't available or times out, fail open (assume not tracked)
-        # This prevents false positives when git is unavailable
-        return False
+        # Return None to indicate git is not available
+        return None
 
 
 # Patterns that might indicate hardcoded secrets
@@ -329,12 +351,24 @@ def check_no_sensitive_files_committed(repo_path: Path) -> CheckResult:
     Note: This checks if files are actually tracked by git, not just
     if they exist on disk. A .env file that exists locally but is
     properly gitignored will NOT trigger a failure.
+
+    If git is not available, returns a partial pass with a warning.
     """
+    # First check if git is available
+    if not is_git_available(repo_path):
+        return CheckResult(
+            passed=True,
+            partial=True,
+            evidence="Git not available - unable to verify tracked files",
+            suggestion="Ensure git is installed to enable sensitive file tracking verification.",
+        )
+
     tracked_sensitive: list[str] = []
 
     for sensitive_file in SENSITIVE_FILES:
         # Only flag if the file is actually tracked by git
-        if is_file_tracked_by_git(repo_path, sensitive_file):
+        result = is_file_tracked_by_git(repo_path, sensitive_file)
+        if result is True:
             tracked_sensitive.append(sensitive_file)
 
     if tracked_sensitive:

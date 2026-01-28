@@ -667,6 +667,10 @@ def calculate_domain_score(passed: int, total: int) -> float:
 def calculate_overall_score(domain_scores: dict[str, DomainScore]) -> float:
     """Calculate weighted overall score from domain scores.
 
+    Uses the weight stored in each DomainScore object, which respects
+    any custom weights from AuditConfig. Falls back to default weights
+    if the domain weight is not set.
+
     Args:
         domain_scores: Dictionary of domain name to DomainScore.
 
@@ -675,7 +679,11 @@ def calculate_overall_score(domain_scores: dict[str, DomainScore]) -> float:
     """
     total = 0.0
     for domain_name, domain in domain_scores.items():
-        weight = DOMAIN_WEIGHTS.get(domain_name, 0.0)
+        # Use the weight from the DomainScore (set from config),
+        # falling back to defaults only if not configured
+        weight = (
+            domain.weight if domain.weight > 0 else DOMAIN_WEIGHTS.get(domain_name, 0.0)
+        )
         domain.weighted_score = domain.score * weight
         total += domain.weighted_score
     return total
