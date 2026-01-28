@@ -5,45 +5,45 @@
 ```json
 {
   "review": {
-    "summary": "This PR implements a major version upgrade (v3) to the audit logic, introducing domain-based scoring and significantly expanding the check suite (~3000 LOC). While the architectural changes align with the described specs, there are significant quality risks: \n\n1. **Zero test coverage**: No new tests were added for the 24 new checks or the new scoring logic.\n2. **Compatibility**: Usage of Python 3.10+ syntax (`type | type`) without clear indication of project constraints.\n3. **Robustness**: Heuristic checks (AST, Git) may behave inconsistently across different environments or languages without stricter safeguards.\n\nI recommend adding comprehensive unit tests for the new check modules and validating the scoring logic before merging.",
+    "summary": "This PR implements a significant upgrade to the audit system (v3) with domain-based scoring and comprehensive new checks. The architecture is sound and the test coverage is excellent. However, there are a few issues to address before merging: the accidental inclusion of a review artifact file, a Python version compatibility issue with new syntax, and potential UX issues when running the security audit on non-git directories.",
     "decision": "REQUEST_CHANGES"
   },
   "issues": [
     {
       "id": 1,
-      "severity": "critical",
-      "file": "tests/",
-      "line": 0,
-      "title": "Missing unit tests for new functionality",
-      "description": "The PR introduces ~3000 lines of code including 24 new audit checks and a completely new scoring algorithm (`agent_readiness_audit/checks/*.py`, `scanner.py`), but the file list shows no additions to the `tests/` directory. Deploying such a large logic expansion without test coverage (especially for heuristics involving regex and AST parsing) carries high regression risk.",
-      "suggestion": "Add unit tests for each new check module (testing both pass and fail cases with mock files) and the new `DomainScore` calculation logic."
+      "severity": "important",
+      "file": "REVIEW_INSTRUCTIONS.md",
+      "line": 1,
+      "title": "Accidental commit of review artifact",
+      "description": "The file `REVIEW_INSTRUCTIONS.md` appears to be an output artifact from an AI review process (containing a JSON report with specific findings like '0% coverage') rather than project documentation. Although commit messages mention removing it, the diff indicates it is currently present in the PR.",
+      "suggestion": "Remove `REVIEW_INSTRUCTIONS.md` from the repository."
     },
     {
       "id": 2,
       "severity": "important",
       "file": "agent_readiness_audit/checks/documentation.py",
       "line": 0,
-      "title": "Python version compatibility issue (PEP 604)",
-      "description": "The change to use bitwise OR for type unions in `isinstance(..., type | type)` is valid only in Python 3.10+. If this tool is intended to support environments with Python 3.8 or 3.9 (common in CI/CD or older dev environments), this will raise a `TypeError`.",
-      "suggestion": "Verify the project's `requires-python` constraint. If < 3.10 support is needed, revert to using a tuple: `isinstance(..., (TypeA, TypeB))`."
+      "title": "Python 3.10+ syntax usage limits compatibility",
+      "description": "The use of the union operator `|` in `isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef)` is only valid in Python 3.10 and later. If this tool is intended to run in environments with Python 3.8 or 3.9 (common in CI/CD or AWS Lambda), this code will crash with a SyntaxError.",
+      "suggestion": "Revert to using a tuple: `isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))` unless Python 3.10+ is explicitly required in `pyproject.toml`."
     },
     {
       "id": 3,
-      "severity": "important",
-      "file": "agent_readiness_audit/models.py",
+      "severity": "suggestion",
+      "file": "agent_readiness_audit/checks/security_advanced.py",
       "line": 0,
-      "title": "Missing validation for scoring weights",
-      "description": "The `calculate_overall_score` function relies on `DOMAIN_WEIGHTS` to compute the final weighted percentage. There is no visible validation to ensure these weights sum exactly to 1.0 (or 100). If the configuration drifts, the calculated 'Overall Score' will be mathematically incorrect (e.g., max score < 100%).",
-      "suggestion": "Add a validation assertion or check (e.g., in `__init__` or module scope) to ensure `sum(DOMAIN_WEIGHTS.values())` equals 1.0 within a floating-point tolerance."
+      "title": "Security check fails on non-git directories",
+      "description": "The check `check_no_sensitive_files_committed` relies on `git ls-files`. If the audit is run on a source distribution (e.g., a zip download or a container without `.git`), the check appears to fail (return False). This penalizes the score for valid codebases simply because the git history is missing.",
+      "suggestion": "Update the check to return a 'Partial' pass or 'Skipped' status with a warning if git is unavailable, rather than failing the check."
     },
     {
       "id": 4,
       "severity": "suggestion",
-      "file": "agent_readiness_audit/checks/interfaces_contracts.py",
+      "file": "agent_readiness_audit/checks/determinism_advanced.py",
       "line": 0,
-      "title": "Language-specific checks in general audit",
-      "description": "Checks like `check_return_types_documented` rely exclusively on Python AST parsing. If this audit tool is run on the 'Node.js/TypeScript' repository mentioned in the project context, these checks may result in empty/partial findings that could unfairly skew the 'Interfaces' domain score if not handled as 'Not Applicable'.",
-      "suggestion": "Ensure language-specific checks return a distinct 'Skipped' or 'N/A' status that excludes them from the domain score denominator if no relevant files are found, rather than a partial pass/fail."
+      "title": "Global state regex indentation logic",
+      "description": "The regex `^(?!    )(\\w+)` used in `check_no_global_state_mutation` effectively enforces that variables must be at column 0 to be matched (because `\\w` cannot match a space). The negative lookahead `(?!    )` is technically redundant or potentially misleading regarding intent (checking for indentation < 4 spaces).",
+      "suggestion": "Simplify the regex to `^(\\w+)` to clearly indicate checking for top-level assignments, or adjust logic if the intent was to catch slightly indented globals."
     }
   ]
 }
