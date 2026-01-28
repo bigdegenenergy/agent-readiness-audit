@@ -5,36 +5,45 @@
 ```json
 {
   "review": {
-    "summary": "This PR implements the ARA v3 specification with domain-based scoring and significantly expands the check coverage. While the architecture and majority of new checks look solid, there are a few implementation issues. Most notably, a compatibility regression with Python <3.10 syntax, a logic flaw that penalizes standard CI workflows, and potentially outdated security regexes.",
+    "summary": "The PR introduces a comprehensive v3 audit system with domain-based scoring and numerous new checks. However, there are logic issues regarding hardcoded scoring weights that bypass configuration, potential Python version incompatibility with modern syntax usage, and fail-open security checks when git is unavailable. Additionally, a review artifact file appears to be accidentally included.",
     "decision": "REQUEST_CHANGES"
   },
   "issues": [
     {
       "id": 1,
       "severity": "important",
-      "file": "agent_readiness_audit/checks/documentation.py",
-      "line": 15,
-      "title": "Python Version Incompatibility",
-      "description": "The use of the bitwise OR operator `|` for union types in `isinstance` (`ast.FunctionDef | ast.AsyncFunctionDef`) was introduced in Python 3.10. This will cause a `TypeError` on Python 3.8 and 3.9, which are likely still supported environments for this tool.",
-      "suggestion": "Revert to using a tuple: `isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))`."
+      "file": "agent_readiness_audit/models.py",
+      "line": 0,
+      "title": "Hardcoded weights in overall score calculation",
+      "description": "The `calculate_overall_score` function utilizes the global constant `DOMAIN_WEIGHTS` directly. This ignores any custom weights that might be defined in the passed `AuditConfig` (via `DomainConfig`), rendering the configuration ineffective and tightly coupling the scoring logic to defaults.",
+      "suggestion": "Update `calculate_overall_score` to retrieve weights from the `AuditConfig` or the `domain_scores` objects if they carry weight information, falling back to defaults only if necessary."
     },
     {
       "id": 2,
       "severity": "important",
-      "file": "agent_readiness_audit/checks/structure_discoverability.py",
-      "line": 95,
-      "title": "False Positive on CI Workflows",
-      "description": "The `check_no_hidden_critical_logic` check includes `.github/workflows/*.yml` in its `hidden_patterns`. The check logic fails if *any* file matching these patterns is found. This means any repository with standard GitHub Actions workflows will fail this audit check, which is incorrect behavior as CI configuration is expected in that location.",
-      "suggestion": "Remove `.github/workflows/*.yml` from `hidden_patterns`. If the intent is to find excessive logic in YAML files, the check needs to analyze file size or content, not just existence."
+      "file": "agent_readiness_audit/checks/documentation.py",
+      "line": 0,
+      "title": "Python version compatibility (PEP 604)",
+      "description": "The change to use `isinstance(node, ast.AsyncFunctionDef | ast.FunctionDef)` utilizes the bitwise OR union syntax which is only available in Python 3.10+. If this package targets Python 3.8 or 3.9 (common in enterprise or CI environments), this will raise a `TypeError`.",
+      "suggestion": "Revert to using a tuple `(ast.AsyncFunctionDef, ast.FunctionDef)` for `isinstance` checks unless the project explicitly declares `requires-python = \">=3.10\"` in its packaging configuration."
     },
     {
       "id": 3,
-      "severity": "suggestion",
+      "severity": "important",
       "file": "agent_readiness_audit/checks/security_advanced.py",
-      "line": 32,
-      "title": "Outdated OpenAI Key Regex",
-      "description": "The regex `sk-[a-zA-Z0-9]{48}` matches legacy OpenAI keys but will miss newer 'project' keys (which start with `sk-proj-` and are longer) and other new formats.",
-      "suggestion": "Update the OpenAI key regex to support newer formats. For example: `r'sk-(proj-)?[a-zA-Z0-9-]{40,}'`."
+      "line": 0,
+      "title": "Fail-open logic in security checks when Git is missing",
+      "description": "The `is_file_tracked_by_git` helper returns `False` if the git command fails (e.g., `FileNotFoundError` if git is missing). In `check_no_sensitive_files_committed`, this leads to a PASS result (assuming the file is not tracked) even if it effectively couldn't be checked. This poses a security risk in environments without git.",
+      "suggestion": "Detect if `git` is available once at the start of the scan. If unavailable, either skip the git-dependent checks with a warning or treat them as a failure/error, rather than silently passing them."
+    },
+    {
+      "id": 4,
+      "severity": "suggestion",
+      "file": "REVIEW_INSTRUCTIONS.md",
+      "line": 1,
+      "title": "Accidental file inclusion",
+      "description": "The file `REVIEW_INSTRUCTIONS.md` appears to be a documentation artifact, test fixture, or mock data for the review agent and likely should not be committed to the codebase.",
+      "suggestion": "Remove `REVIEW_INSTRUCTIONS.md` from the PR."
     }
   ]
 }
