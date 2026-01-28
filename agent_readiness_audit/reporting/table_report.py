@@ -7,7 +7,12 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
-from agent_readiness_audit.models import ReadinessLevel, RepoResult, ScanSummary
+from agent_readiness_audit.models import (
+    AgentGrade,
+    ReadinessLevel,
+    RepoResult,
+    ScanSummary,
+)
 
 
 def get_level_color(level: ReadinessLevel) -> str:
@@ -34,6 +39,29 @@ def get_score_color(score: float, max_score: float = 16.0) -> str:
         return "red"
 
 
+def get_grade_color(grade: AgentGrade) -> str:
+    """Get color for agent grade (v3)."""
+    colors = {
+        AgentGrade.AGENT_FIRST: "green",
+        AgentGrade.AGENT_COMPATIBLE: "cyan",
+        AgentGrade.HUMAN_FIRST_RISKY: "yellow",
+        AgentGrade.AGENT_HOSTILE: "red",
+    }
+    return colors.get(grade, "white")
+
+
+def get_domain_score_color(score: float) -> str:
+    """Get color based on domain score (0-100)."""
+    if score >= 90:
+        return "green"
+    elif score >= 75:
+        return "cyan"
+    elif score >= 60:
+        return "yellow"
+    else:
+        return "red"
+
+
 def render_table_report(summary: ScanSummary, console: Console) -> None:
     """Render scan summary as a Rich table.
 
@@ -41,19 +69,20 @@ def render_table_report(summary: ScanSummary, console: Console) -> None:
         summary: Scan summary to render.
         console: Rich console to output to.
     """
-    # Summary header
+    # Summary header with v3 overall score
     console.print()
     console.print(
         Panel.fit(
             f"[bold]Agent Readiness Audit[/bold]\n"
-            f"Scanned {summary.total_repos} repository(ies) | "
-            f"Average Score: {summary.average_score:.1f}/16",
+            f"Scanned {summary.total_repos} repository(ies)\n"
+            f"Average Score: {summary.average_overall_score:.0f}% | "
+            f"Legacy Score: {summary.average_score:.1f}/16",
             border_style="blue",
         )
     )
     console.print()
 
-    # Main results table
+    # Main results table with v3 grade
     table = Table(
         title="Scan Results",
         show_header=True,
@@ -62,23 +91,26 @@ def render_table_report(summary: ScanSummary, console: Console) -> None:
     )
 
     table.add_column("Repository", style="cyan", no_wrap=True)
-    table.add_column("Score", justify="center")
-    table.add_column("Level", justify="center")
+    table.add_column("Overall", justify="center")
+    table.add_column("Grade", justify="center")
+    table.add_column("Legacy", justify="center")
     table.add_column("Top Issues", style="dim")
 
     for repo in summary.repos:
-        score_color = get_score_color(repo.score_total)
-        level_color = get_level_color(repo.level)
+        overall_color = get_domain_score_color(repo.overall_score)
+        grade_color = get_grade_color(repo.grade)
+        legacy_color = get_score_color(repo.score_total)
 
         # Format top issues
         top_issues = ", ".join(repo.fix_first[:2]) if repo.fix_first else "None"
-        if len(top_issues) > 40:
-            top_issues = top_issues[:37] + "..."
+        if len(top_issues) > 35:
+            top_issues = top_issues[:32] + "..."
 
         table.add_row(
             repo.repo_name,
-            Text(f"{repo.score_total:.1f}/16", style=score_color),
-            Text(repo.level.value, style=level_color),
+            Text(f"{repo.overall_score:.0f}%", style=overall_color),
+            Text(repo.grade.value, style=grade_color),
+            Text(f"{repo.score_total:.1f}", style=legacy_color),
             top_issues,
         )
 
@@ -97,9 +129,46 @@ def render_detailed_repo(result: RepoResult, console: Console) -> None:
         result: Repository result to render.
         console: Rich console to output to.
     """
-    # Category breakdown table
+    # v3 Domain scores table
+    if result.domain_scores:
+        domain_table = Table(
+            title="Domain Scores (v3)",
+            show_header=True,
+            header_style="bold",
+            border_style="dim",
+        )
+
+        domain_table.add_column("Domain", style="cyan")
+        domain_table.add_column("Score", justify="center")
+        domain_table.add_column("Weight", justify="center")
+        domain_table.add_column("Weighted", justify="center")
+        domain_table.add_column("Status", justify="center")
+
+        for domain_name, domain_score in result.domain_scores.items():
+            score_color = get_domain_score_color(domain_score.score)
+
+            # Status indicator
+            if domain_score.score >= 90:
+                status = Text("✓", style="green")
+            elif domain_score.score >= 60:
+                status = Text("◐", style="yellow")
+            else:
+                status = Text("✗", style="red")
+
+            domain_table.add_row(
+                domain_name.replace("_", " ").title(),
+                Text(f"{domain_score.score:.0f}%", style=score_color),
+                f"{domain_score.weight * 100:.0f}%",
+                f"{domain_score.weighted_score:.1f}",
+                status,
+            )
+
+        console.print(domain_table)
+        console.print()
+
+    # Category breakdown table (legacy)
     cat_table = Table(
-        title="Category Breakdown",
+        title="Category Breakdown (Legacy)",
         show_header=True,
         header_style="bold",
         border_style="dim",

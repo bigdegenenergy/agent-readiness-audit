@@ -164,9 +164,18 @@ def scan(
         int | None,
         typer.Option(
             "--min-score",
-            help="Override minimum score required to pass (0-16).",
+            help="Override minimum legacy score required to pass (0-16).",
             min=0,
             max=16,
+        ),
+    ] = None,
+    min_overall: Annotated[
+        float | None,
+        typer.Option(
+            "--min-overall",
+            help="Override minimum overall score required to pass (0-100, v3).",
+            min=0.0,
+            max=100.0,
         ),
     ] = None,
 ) -> None:
@@ -234,15 +243,27 @@ def scan(
 
     # Check strict mode
     if strict:
-        min_required = (
-            min_score if min_score is not None else audit_config.minimum_passing_score
-        )
-        failing_repos = [r for r in summary.repos if r.score_total < min_required]
-        if failing_repos:
-            err_console.print(
-                f"\n[red]Strict mode: {len(failing_repos)} repo(s) below minimum score of {min_required}[/red]"
+        # Check v3 overall score first (if specified)
+        if min_overall is not None:
+            failing_repos = [r for r in summary.repos if r.overall_score < min_overall]
+            if failing_repos:
+                err_console.print(
+                    f"\n[red]Strict mode: {len(failing_repos)} repo(s) below minimum overall score of {min_overall}%[/red]"
+                )
+                raise typer.Exit(1)
+        else:
+            # Fall back to legacy score check
+            min_required = (
+                min_score
+                if min_score is not None
+                else audit_config.minimum_passing_score
             )
-            raise typer.Exit(1)
+            failing_repos = [r for r in summary.repos if r.score_total < min_required]
+            if failing_repos:
+                err_console.print(
+                    f"\n[red]Strict mode: {len(failing_repos)} repo(s) below minimum score of {min_required}[/red]"
+                )
+                raise typer.Exit(1)
 
 
 @app.command()

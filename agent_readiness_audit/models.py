@@ -28,6 +28,23 @@ class ReadinessLevel(str, Enum):
     AGENT_READY = "Agent-Ready Factory"
 
 
+class AgentGrade(str, Enum):
+    """Agent readiness grade based on weighted percentage score (v3 spec)."""
+
+    AGENT_FIRST = "Agent-First"
+    AGENT_COMPATIBLE = "Agent-Compatible"
+    HUMAN_FIRST_RISKY = "Human-First, Agent-Risky"
+    AGENT_HOSTILE = "Agent-Hostile"
+
+
+AGENT_GRADE_DESCRIPTIONS: dict[str, str] = {
+    "Agent-First": "Repo is optimized for autonomous agent operation. Agents can read, modify, and execute workflows safely.",
+    "Agent-Compatible": "Repo supports agent operation with minor friction. Most agent tasks will succeed.",
+    "Human-First, Agent-Risky": "Repo works for humans but has significant agent risks. Agents may fail due to ambiguity or missing guardrails.",
+    "Agent-Hostile": "Repo is unsuitable for agent operation. Agents should not be trusted to work in this environment.",
+}
+
+
 class MaturityLevel(int, Enum):
     """Agent-native maturity level (v2)."""
 
@@ -73,6 +90,76 @@ class Pillar(str, Enum):
     EVAL_FRAMEWORKS = "eval_frameworks"
     GOLDEN_DATASETS = "golden_datasets"
     DISTRIBUTION_DX = "distribution_dx"
+
+
+class Domain(str, Enum):
+    """v3 Domains for weighted scoring per ARA specification."""
+
+    STRUCTURE = "structure"
+    INTERFACES = "interfaces"
+    DETERMINISM = "determinism"
+    SECURITY = "security"
+    TESTING = "testing"
+    ERGONOMICS = "ergonomics"
+
+
+# Domain weights per specification (must sum to 100%)
+DOMAIN_WEIGHTS: dict[str, float] = {
+    "structure": 0.15,  # Structure & Discoverability - 15%
+    "interfaces": 0.20,  # Interfaces & Contracts - 20%
+    "determinism": 0.20,  # Determinism & Side Effects - 20%
+    "security": 0.20,  # Security & Blast Radius - 20%
+    "testing": 0.15,  # Testing & Validation - 15%
+    "ergonomics": 0.10,  # Agent Ergonomics - 10%
+}
+
+# Validate that domain weights sum to 1.0 (within floating point tolerance)
+_weight_sum = sum(DOMAIN_WEIGHTS.values())
+if not (0.999 <= _weight_sum <= 1.001):
+    raise ValueError(
+        f"DOMAIN_WEIGHTS must sum to 1.0, got {_weight_sum}. "
+        "Check that all domain weights are correctly configured."
+    )
+
+DOMAIN_DESCRIPTIONS: dict[str, str] = {
+    "structure": "Can an agent quickly understand what this repo is and how it is organized?",
+    "interfaces": "Are inputs, outputs, and side effects machine-verifiable?",
+    "determinism": "Can an agent replay execution safely and get the same result?",
+    "security": "Can an agent operate without leaking secrets or damaging external systems?",
+    "testing": "Can an agent verify correctness autonomously?",
+    "ergonomics": "Is the repo pleasant for an agent to work in?",
+}
+
+# Mapping from v1 categories to v3 domains
+CATEGORY_TO_DOMAIN: dict[str, str] = {
+    "discoverability": "structure",
+    "deterministic_setup": "determinism",
+    "build_and_run": "ergonomics",
+    "test_feedback_loop": "testing",
+    "static_guardrails": "interfaces",
+    "observability": "ergonomics",
+    "ci_enforcement": "ergonomics",
+    "security_and_governance": "security",
+}
+
+# Mapping from v2 pillars to v3 domains
+PILLAR_TO_DOMAIN: dict[str, str] = {
+    "environment_determinism": "determinism",
+    "fast_guardrails": "interfaces",
+    "type_contracts": "interfaces",
+    "verification_trust": "testing",
+    "verification_speed": "testing",
+    "documentation_structure": "structure",
+    "inline_documentation": "structure",
+    "contribution_contract": "ergonomics",
+    "agentic_security": "security",
+    "secret_hygiene": "security",
+    "telemetry_tracing": "ergonomics",
+    "structured_logging_cost": "ergonomics",
+    "eval_frameworks": "testing",
+    "golden_datasets": "testing",
+    "distribution_dx": "ergonomics",
+}
 
 
 # Pillar to v1 category mapping for backward compatibility
@@ -160,6 +247,26 @@ class PillarScore(BaseModel):
         return (self.score / self.max_points) * 100
 
 
+class DomainScore(BaseModel):
+    """Score for a single v3 domain (0-100 scale)."""
+
+    name: str
+    description: str = ""
+    score: float = 0.0  # 0-100 scale
+    weight: float = 0.0  # Percentage weight (0.0-1.0)
+    weighted_score: float = 0.0  # score * weight
+    checks: list[CheckResult] = Field(default_factory=list)
+    passed_checks: int = 0
+    total_checks: int = 0
+    evidence: list[str] = Field(default_factory=list)  # Collected evidence
+    red_flags: list[str] = Field(default_factory=list)  # Immediate failures
+
+    @property
+    def percentage(self) -> float:
+        """Return score as percentage (same as score for domains)."""
+        return self.score
+
+
 class GateStatus(BaseModel):
     """Status of gate checks for a maturity level."""
 
@@ -207,12 +314,24 @@ class RepoResult(BaseModel):
     fix_first: list[str] = Field(default_factory=list)
     scanned_at: datetime = Field(default_factory=datetime.now)
 
+    # v3 domain-based scoring
+    domain_scores: dict[str, DomainScore] = Field(default_factory=dict)
+    overall_score: float = 0.0  # Weighted sum of domain scores (0-100)
+    grade: AgentGrade = AgentGrade.AGENT_HOSTILE
+    grade_description: str = ""
+    remediation_items: list[str] = Field(default_factory=list)  # Ordered fix list
+
     @property
     def percentage(self) -> float:
         """Return total score as percentage."""
         if self.max_score == 0:
             return 0.0
         return (self.score_total / self.max_score) * 100
+
+    @property
+    def overall_percentage(self) -> float:
+        """Return v3 overall score (already 0-100 scale)."""
+        return self.overall_score
 
 
 class ScanSummary(BaseModel):
@@ -225,6 +344,8 @@ class ScanSummary(BaseModel):
     average_score: float = 0.0
     level_distribution: dict[str, int] = Field(default_factory=dict)
     maturity_distribution: dict[str, int] = Field(default_factory=dict)  # v2
+    grade_distribution: dict[str, int] = Field(default_factory=dict)  # v3
+    average_overall_score: float = 0.0  # v3: weighted average (0-100)
 
     def calculate_summary(self) -> None:
         """Calculate summary statistics from repo results."""
@@ -248,6 +369,17 @@ class ScanSummary(BaseModel):
                 self.maturity_distribution.get(name, 0) + 1
             )
 
+        # Count grade distribution (v3)
+        self.grade_distribution = {}
+        for repo in self.repos:
+            grade = repo.grade.value
+            self.grade_distribution[grade] = self.grade_distribution.get(grade, 0) + 1
+
+        # Calculate average overall score (v3)
+        self.average_overall_score = (
+            sum(r.overall_score for r in self.repos) / self.total_repos
+        )
+
 
 class ScoreLevelMapping(BaseModel):
     """Mapping from score range to readiness level."""
@@ -270,6 +402,14 @@ class CheckConfig(BaseModel):
 
     enabled: bool = True
     weight: float = 1.0
+
+
+class DomainConfig(BaseModel):
+    """Configuration for a v3 scoring domain."""
+
+    enabled: bool = True
+    weight: float = 0.0  # Will be set from DOMAIN_WEIGHTS
+    description: str = ""
 
 
 class ThresholdConfig(BaseModel):
@@ -350,7 +490,9 @@ class AuditConfig(BaseModel):
 
     scale_points_total: int = 16
     minimum_passing_score: int = 10
+    minimum_overall_score: float = 60.0  # v3: minimum weighted score for pass
     categories: dict[str, CategoryConfig] = Field(default_factory=dict)
+    domains: dict[str, DomainConfig] = Field(default_factory=dict)  # v3
     checks: dict[str, CheckConfig] = Field(default_factory=dict)
     detection: DetectionConfig = Field(default_factory=DetectionConfig)
     thresholds: ThresholdConfig = Field(default_factory=ThresholdConfig)  # v2
@@ -387,7 +529,33 @@ class AuditConfig(BaseModel):
                 "security_and_governance": CategoryConfig(
                     description="Baseline hygiene around secrets and contribution policy"
                 ),
-            }
+            },
+            domains={
+                "structure": DomainConfig(
+                    weight=DOMAIN_WEIGHTS["structure"],
+                    description=DOMAIN_DESCRIPTIONS["structure"],
+                ),
+                "interfaces": DomainConfig(
+                    weight=DOMAIN_WEIGHTS["interfaces"],
+                    description=DOMAIN_DESCRIPTIONS["interfaces"],
+                ),
+                "determinism": DomainConfig(
+                    weight=DOMAIN_WEIGHTS["determinism"],
+                    description=DOMAIN_DESCRIPTIONS["determinism"],
+                ),
+                "security": DomainConfig(
+                    weight=DOMAIN_WEIGHTS["security"],
+                    description=DOMAIN_DESCRIPTIONS["security"],
+                ),
+                "testing": DomainConfig(
+                    weight=DOMAIN_WEIGHTS["testing"],
+                    description=DOMAIN_DESCRIPTIONS["testing"],
+                ),
+                "ergonomics": DomainConfig(
+                    weight=DOMAIN_WEIGHTS["ergonomics"],
+                    description=DOMAIN_DESCRIPTIONS["ergonomics"],
+                ),
+            },
         )
 
 
@@ -456,3 +624,74 @@ def get_maturity_name(level: int) -> str:
 def get_maturity_description(level: int) -> str:
     """Get description for maturity level."""
     return MATURITY_DESCRIPTIONS.get(level, "")
+
+
+def get_grade_for_score(score: float) -> AgentGrade:
+    """Determine agent grade based on weighted score (v3).
+
+    Args:
+        score: Overall weighted score (0-100).
+
+    Returns:
+        Agent grade based on score thresholds.
+    """
+    if score >= 90:
+        return AgentGrade.AGENT_FIRST
+    elif score >= 75:
+        return AgentGrade.AGENT_COMPATIBLE
+    elif score >= 60:
+        return AgentGrade.HUMAN_FIRST_RISKY
+    else:
+        return AgentGrade.AGENT_HOSTILE
+
+
+def get_grade_description(grade: AgentGrade) -> str:
+    """Get description for agent grade.
+
+    Args:
+        grade: Agent grade enum value.
+
+    Returns:
+        Human-readable description of what the grade means.
+    """
+    return AGENT_GRADE_DESCRIPTIONS.get(grade.value, "")
+
+
+def calculate_domain_score(passed: int, total: int) -> float:
+    """Calculate domain score on 0-100 scale.
+
+    Args:
+        passed: Number of passed checks.
+        total: Total number of checks.
+
+    Returns:
+        Score from 0 to 100.
+    """
+    if total == 0:
+        return 0.0
+    return (passed / total) * 100
+
+
+def calculate_overall_score(domain_scores: dict[str, DomainScore]) -> float:
+    """Calculate weighted overall score from domain scores.
+
+    Uses the weight stored in each DomainScore object, which respects
+    any custom weights from AuditConfig. Falls back to default weights
+    if the domain weight is not set.
+
+    Args:
+        domain_scores: Dictionary of domain name to DomainScore.
+
+    Returns:
+        Weighted overall score (0-100).
+    """
+    total = 0.0
+    for domain_name, domain in domain_scores.items():
+        # Use the weight from the DomainScore (set from config),
+        # falling back to defaults only if not configured
+        weight = (
+            domain.weight if domain.weight > 0 else DOMAIN_WEIGHTS.get(domain_name, 0.0)
+        )
+        domain.weighted_score = domain.score * weight
+        total += domain.weighted_score
+    return total
