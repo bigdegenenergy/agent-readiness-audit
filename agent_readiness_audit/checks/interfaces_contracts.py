@@ -9,6 +9,7 @@ These checks evaluate whether inputs, outputs, and side effects are machine-veri
 
 from __future__ import annotations
 
+import ast
 from pathlib import Path
 
 from agent_readiness_audit.checks.base import (
@@ -228,7 +229,7 @@ def check_cli_typed_args(repo_path: Path) -> CheckResult:
 def check_return_types_documented(repo_path: Path) -> CheckResult:
     """Check that functions have return type annotations.
 
-    Samples functions and checks for -> annotation.
+    Uses AST parsing for accurate function detection.
     """
     py_files = glob_files(repo_path, "**/*.py")[:30]
 
@@ -243,11 +244,18 @@ def check_return_types_documented(repo_path: Path) -> CheckResult:
         if not content:
             continue
 
-        lines = content.split("\n")
-        for line in lines:
-            if line.strip().startswith("def "):
+        try:
+            tree = ast.parse(content, filename=str(py_file))
+        except SyntaxError:
+            continue
+
+        for node in ast.walk(tree):
+            if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
+                # Skip private/dunder methods
+                if node.name.startswith("_"):
+                    continue
                 functions_checked += 1
-                if " -> " in line:
+                if node.returns is not None:
                     functions_with_return_type += 1
 
     if functions_checked == 0:

@@ -42,8 +42,9 @@ def is_file_tracked_by_git(repo_path: Path, file_path: str) -> bool:
         )
         return result.returncode == 0
     except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
-        # If git isn't available or times out, fall back to file existence
-        return (repo_path / file_path).exists()
+        # If git isn't available or times out, fail open (assume not tracked)
+        # This prevents false positives when git is unavailable
+        return False
 
 
 # Patterns that might indicate hardcoded secrets
