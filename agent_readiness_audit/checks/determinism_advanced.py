@@ -287,6 +287,8 @@ def check_no_global_state_mutation(repo_path: Path) -> CheckResult:
     - Module-level mutable state (lists, dicts assigned at module level)
     - Singleton patterns without clear reset mechanisms
     - Global variables modified in functions
+
+    Note: Common legitimate patterns are excluded (loggers, app instances, etc.)
     """
     py_files = glob_files(repo_path, "**/*.py")[:50]
     red_flags: list[str] = []
@@ -296,6 +298,43 @@ def check_no_global_state_mutation(repo_path: Path) -> CheckResult:
         ("= []", "module-level list"),
         ("= {}", "module-level dict"),
         ("global ", "global keyword usage"),
+    ]
+
+    # Common legitimate module-level patterns to exclude
+    # These are standard Python idioms that don't represent problematic global state
+    legitimate_patterns = [
+        "logger",
+        "log",
+        "logging.getLogger",
+        "getLogger",
+        "app",
+        "application",
+        "FastAPI",
+        "Flask",
+        "Celery",
+        "SQLAlchemy",
+        "engine",
+        "Session",
+        "Base",
+        "router",
+        "blueprint",
+        "APIRouter",
+        "Typer",
+        "click",
+        "argparse",
+        "console",
+        "Console",
+        # Constants that happen to use list/dict syntax
+        "ALLOWED",
+        "SUPPORTED",
+        "VALID",
+        "DEFAULT",
+        "CONFIG",
+        "SETTINGS",
+        "OPTIONS",
+        "CHOICES",
+        "MAPPING",
+        "REGISTRY",
     ]
 
     for py_file in py_files:
@@ -316,9 +355,22 @@ def check_no_global_state_mutation(repo_path: Path) -> CheckResult:
 
             for pattern, desc in global_patterns:
                 if pattern in line and not line.strip().startswith("#"):
-                    # Additional filter: skip type annotations
+                    # Skip type annotations
                     if ": list" in line or ": dict" in line:
                         continue
+
+                    # Skip legitimate patterns (case-insensitive check)
+                    line_lower = line.lower()
+                    if any(
+                        legit.lower() in line_lower for legit in legitimate_patterns
+                    ):
+                        continue
+
+                    # Skip UPPER_CASE constants (Python convention)
+                    var_match = line.split("=")[0].strip() if "=" in line else ""
+                    if var_match and var_match.isupper():
+                        continue
+
                     red_flags.append(f"{py_file.name}:{i + 1}: {desc}")
 
         if len(red_flags) >= 3:

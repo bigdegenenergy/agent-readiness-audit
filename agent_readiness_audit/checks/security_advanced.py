@@ -10,6 +10,7 @@ These checks evaluate whether a repository is safe for autonomous agent operatio
 from __future__ import annotations
 
 import re
+import subprocess
 from pathlib import Path
 
 from agent_readiness_audit.checks.base import (
@@ -19,6 +20,31 @@ from agent_readiness_audit.checks.base import (
     glob_files,
     read_file_safe,
 )
+
+
+def is_file_tracked_by_git(repo_path: Path, file_path: str) -> bool:
+    """Check if a file is tracked by git (not just exists on disk).
+
+    Args:
+        repo_path: Path to the repository root.
+        file_path: Relative path to the file.
+
+    Returns:
+        True if the file is tracked by git, False otherwise.
+    """
+    try:
+        result = subprocess.run(
+            ["git", "ls-files", "--error-unmatch", file_path],
+            cwd=repo_path,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        return result.returncode == 0
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+        # If git isn't available or times out, fall back to file existence
+        return (repo_path / file_path).exists()
+
 
 # Patterns that might indicate hardcoded secrets
 SECRET_PATTERNS = [
@@ -67,11 +93,13 @@ def check_no_hardcoded_secrets(repo_path: Path) -> CheckResult:
     findings: list[str] = []
 
     # Scan Python, JS, TS, and config files
+    # Use higher limit (500 per pattern) to ensure thorough security scanning
     patterns_to_scan = ["**/*.py", "**/*.js", "**/*.ts", "**/*.yaml", "**/*.yml"]
     files_scanned = 0
+    max_files_per_pattern = 500
 
     for pattern in patterns_to_scan:
-        for file_path in glob_files(repo_path, pattern)[:30]:
+        for file_path in glob_files(repo_path, pattern)[:max_files_per_pattern]:
             # Skip test files and fixtures
             if "test" in str(file_path).lower() or "fixture" in str(file_path).lower():
                 continue
@@ -295,21 +323,27 @@ def check_prod_test_boundary(repo_path: Path) -> CheckResult:
     domain="security",
 )
 def check_no_sensitive_files_committed(repo_path: Path) -> CheckResult:
-    """Check that known sensitive files are not in the repository."""
-    found_sensitive: list[str] = []
+    """Check that known sensitive files are not tracked by git.
+
+    Note: This checks if files are actually tracked by git, not just
+    if they exist on disk. A .env file that exists locally but is
+    properly gitignored will NOT trigger a failure.
+    """
+    tracked_sensitive: list[str] = []
 
     for sensitive_file in SENSITIVE_FILES:
-        if file_exists(repo_path, sensitive_file):
-            found_sensitive.append(sensitive_file)
+        # Only flag if the file is actually tracked by git
+        if is_file_tracked_by_git(repo_path, sensitive_file):
+            tracked_sensitive.append(sensitive_file)
 
-    if found_sensitive:
+    if tracked_sensitive:
         return CheckResult(
             passed=False,
-            evidence=f"Sensitive files committed: {', '.join(found_sensitive)}",
-            suggestion=f"Remove sensitive files ({', '.join(found_sensitive)}) and add to .gitignore.",
+            evidence=f"Sensitive files tracked by git: {', '.join(tracked_sensitive)}",
+            suggestion=f"Remove tracked sensitive files ({', '.join(tracked_sensitive)}) from git and add to .gitignore.",
         )
 
     return CheckResult(
         passed=True,
-        evidence="No sensitive files found in repository",
+        evidence="No sensitive files tracked by git",
     )
