@@ -5,36 +5,45 @@
 ```json
 {
   "review": {
-    "summary": "This PR successfully implements the v3 Agent Readiness Audit specification, introducing domain-based weighted scoring and a suite of new checks. The architecture for the new scoring system (grades, domains) is sound. However, the reliance on simple heuristics (regex) for complex checks like 'Global State Mutation' and 'Hardcoded Secrets' introduces significant risks of false positives and false negatives. Specifically, the arbitrary file limit on security scanning undermines the 'Security' domain score, and the global state check conflicts with standard Python idioms.",
+    "summary": "The PR implements the v3 specification with comprehensive domain checks and scoring. However, there are artifacts from previous reviews included, and several heuristic checks are brittle (regex/string parsing) or lack robustness (missing dependencies).",
     "decision": "REQUEST_CHANGES"
   },
   "issues": [
     {
       "id": 1,
       "severity": "important",
-      "file": "agent_readiness_audit/checks/security_advanced.py",
+      "file": "REVIEW_INSTRUCTIONS.md",
       "line": 1,
-      "title": "Security scan limited to ~30 files creates false sense of security",
-      "description": "The `check_no_hardcoded_secrets` and potential other regex-based scanners limit execution to the first ~30 files (per the summary descriptions). For a security audit contributing 20% to the overall score, skipping the majority of files in a medium-to-large codebase is a critical deficiency. Secrets are rarely conveniently located in the first few files alphabetically.",
-      "suggestion": "Remove or significantly increase the file limit (e.g., to 1000) for security-related text scans. Regex scanning is generally fast enough to handle larger sets, or prioritize scanning config/src directories specifically."
+      "title": "Accidental file commit",
+      "description": "This file appears to be a log or output from a previous review process and should not be committed to the repository.",
+      "suggestion": "Remove the file."
     },
     {
       "id": 2,
       "severity": "important",
-      "file": "agent_readiness_audit/checks/determinism_advanced.py",
-      "line": 1,
-      "title": "Global state check will flag standard module-level patterns (False Positives)",
-      "description": "The `check_no_global_state_mutation` relies on a regex that seemingly flags any top-level variable assignment that isn't all-uppercase. This will incorrectly flag standard Python idioms such as `logger = logging.getLogger(...)`, `app = FastAPI()`, or `db = SQLAlchemy()` as mutable global state violations. This will penalize standard, well-structured applications.",
-      "suggestion": "Refine the regex or logic to exempt common patterns (e.g., assignments involving `logging`, `FastAPI`, `Flask`) or allow list variable names like `logger`, `app`. Alternatively, verify if the assignment is actually mutated later, though that requires complex AST analysis."
+      "file": "agent_readiness_audit/checks/interfaces_contracts.py",
+      "line": 108,
+      "title": "Brittle function signature parsing",
+      "description": "The check `check_return_types_documented` iterates line-by-line looking for `def` and `->` on the same line. This fails for multiline function definitions (common with black/ruff formatting) where `->` is on a subsequent line, causing false negatives.",
+      "suggestion": "Use Python's built-in `ast` module to parse the code and check `FunctionDef.returns` is not None. This is robust and handles all formatting styles."
     },
     {
       "id": 3,
-      "severity": "suggestion",
+      "severity": "important",
       "file": "agent_readiness_audit/checks/security_advanced.py",
-      "line": 1,
-      "title": "Sensitive file check may flag valid local development files",
-      "description": "The `check_no_sensitive_files_committed` check appears to verify file existence on disk. If a developer runs this audit locally, they likely have a `.env` file that is properly gitignored. If the check flags this file merely because it exists on disk, it results in a false positive for the 'committed' check.",
-      "suggestion": "Ensure the check validates that the file is actually tracked by git (e.g., using `git ls-files` or checking if it matches a `.gitignore` pattern) rather than just existing in the directory."
+      "line": 130,
+      "title": "Silent failure on missing git dependency",
+      "description": "`is_file_tracked_by_git` catches all exceptions. If `git` is not installed in the environment (common in minimal CI containers), `subprocess.run` raises `FileNotFoundError` (wrapped in Exception), which returns `False`. This causes `check_no_sensitive_files_committed` to pass (false negative) because it assumes the file is untracked.",
+      "suggestion": "Check for git availability once at module level. If git is missing, either skip the check with a warning or fail open (assume tracked if uncertain) to prevent security oversights."
+    },
+    {
+      "id": 4,
+      "severity": "suggestion",
+      "file": "agent_readiness_audit/checks/interfaces_contracts.py",
+      "line": 135,
+      "title": "Case sensitivity in Dict check",
+      "description": "`check_no_implicit_dict_schemas` looks for `Dict[str, Any]` but may miss `dict[str, Any]` (standard in Python 3.9+) due to case-sensitive string matching.",
+      "suggestion": "Add `dict[...]` patterns or normalize case when checking (while ensuring not to match irrelevant text)."
     }
   ]
 }
