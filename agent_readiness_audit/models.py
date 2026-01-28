@@ -113,6 +113,14 @@ DOMAIN_WEIGHTS: dict[str, float] = {
     "ergonomics": 0.10,  # Agent Ergonomics - 10%
 }
 
+# Validate that domain weights sum to 1.0 (within floating point tolerance)
+_weight_sum = sum(DOMAIN_WEIGHTS.values())
+if not (0.999 <= _weight_sum <= 1.001):
+    raise ValueError(
+        f"DOMAIN_WEIGHTS must sum to 1.0, got {_weight_sum}. "
+        "Check that all domain weights are correctly configured."
+    )
+
 DOMAIN_DESCRIPTIONS: dict[str, str] = {
     "structure": "Can an agent quickly understand what this repo is and how it is organized?",
     "interfaces": "Are inputs, outputs, and side effects machine-verifiable?",
